@@ -1,11 +1,13 @@
 import numpy as np
-from keras.layers import Dense, Conv1D, MaxPool1D, Flatten, Dropout, Activation, Embedding, Input, concatenate, add
+from keras.layers import Dense, Conv1D, MaxPool1D, Flatten, Dropout, Activation, Embedding, Input, concatenate, add, Bidirectional, LSTM
 from keras import Model, regularizers
 from keras.optimizers import Adam, Adadelta, RMSprop, Adagrad
 
 import os
 import sys
 import logging
+
+from metrics import recall, precision, f1, calculate_metrics
 
 # Make the directory for saving model, weight, log
 result_dir = 'result'
@@ -124,7 +126,7 @@ class CNN(object):
         # Model compile
         self.model.compile(loss='categorical_crossentropy',
                            optimizer=opt,
-                           metrics=['accuracy'])
+                           metrics=[f1, precision, recall, 'accuracy'])
 
     def save_model(self):
         # Save the model into the result directory
@@ -150,14 +152,27 @@ class CNN(object):
             # Writing the log
             train_loss = train_history.history['loss'][0]
             train_acc = train_history.history['acc'][0]
+            train_f1 = train_history.history['f1'][0]
+            train_p = train_history.history['precision'][0]
+            train_r = train_history.history['recall'][0]
+
             val_loss = train_history.history['val_loss'][0]
             val_acc = train_history.history['val_acc'][0]
-            logger.info(
-                '##train##, epoch: {}, train_loss: {:.4f}, train_acc: {:.4f}, val_loss: {:.4f}, val_acc: {:.4f}'.format((i + 1),
-                                                                                                                        train_loss,
-                                                                                                                        train_acc,
-                                                                                                                        val_loss,
-                                                                                                                        val_acc))
+            val_f1 = train_history.history['val_f1'][0]
+            val_p = train_history.history['val_precision'][0]
+            val_r = train_history.history['val_recall'][0]
+            logger.info('##train##, epoch: {:2d}, loss: {:.4f}, acc: {:.4f}, prec: {:.4f}, recall: {:.4f}, F1: {:.4f}'.format((i + 1),
+                                                                                                                              train_loss,
+                                                                                                                              train_acc,
+                                                                                                                              train_p,
+                                                                                                                              train_r,
+                                                                                                                              train_f1))
+            logger.info('##dev##,   epoch: {:2d}, loss: {:.4f}, acc: {:.4f}, prec: {:.4f}, recall: {:.4f}, F1: {:.4f}'.format((i+1),
+                                                                                                                              val_loss,
+                                                                                                                              val_acc,
+                                                                                                                              val_p,
+                                                                                                                              val_r,
+                                                                                                                              val_f1))
             # Saving the weight if it is better than before (early-stopping)
             if max_val_acc < val_acc:
                 max_val_acc = val_acc
@@ -242,3 +257,43 @@ class MCCNN(CNN):
             layer_lst.append(drop_l)
 
         self.concat_l = concatenate(layer_lst)
+
+
+class BILSTM(CNN):
+    def __init__(self,
+                 max_sent_len,
+                 vocb,
+                 emb_dim=100,
+                 pos_dim=10,
+                 rnn_dim=100,
+                 dropout_rate=0.2,
+                 optimizer='adam',
+                 lr_rate=0.001,
+                 non_static=True,
+                 use_pretrained=False):
+        self.max_sent_len = max_sent_len
+        self.vocb = vocb
+        self.emb_dim = emb_dim
+        self.pos_dim = pos_dim
+        self.rnn_dim = rnn_dim
+        self.dropout_rate = dropout_rate
+        self.optimizer = optimizer
+        self.lr_rate = lr_rate
+        self.non_static = non_static
+        self.use_pretrained = use_pretrained
+        self.build_model()
+
+    def build_model(self):
+        self.add_input_layer()
+        self.add_embedding_layer()
+        self.add_rnn_layer()
+        self.add_fc_layer()
+        self.compile_model()
+
+    def add_rnn_layer(self):
+        self.rnn_l = Bidirectional(LSTM(self.rnn_dim, dropout=self.dropout_rate,
+                                        recurrent_dropout=self.dropout_rate, return_sequences=True))(self.emb_concat)
+
+    def add_fc_layer(self):
+        self.flat_l = Flatten()(self.rnn_l)
+        self.pred_output = Dense(4, activation='softmax')(self.flat_l)
