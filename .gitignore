@@ -52,7 +52,7 @@ coverage.xml
 *.pot
 
 # Django stuff:
-*.log
+# *.log
 local_settings.py
 db.sqlite3
 
@@ -102,3 +102,7 @@ venv.bak/
 
 # mypy
 .mypy_cache/
+
+#################################################################
+result/model.json
+result/weights.h5
