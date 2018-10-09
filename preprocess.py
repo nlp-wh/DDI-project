@@ -54,8 +54,8 @@ if __name__ == '__main__':
                 token = 'dg'
             tokens.append(token)
         final_sent = ' '.join(tokens)
-        # 7. Replace DRUGA, DRUGB into the original drug name
-        final_sent = final_sent.replace('DRUGA', drug_a).replace('DRUGB', drug_b)
+        # 7. Replace DRUGA, DRUGB into the original drug name (Do this task on data loading time)
+        # final_sent = final_sent.replace('DRUGA', drug_a).replace('DRUGB', drug_b)
         # 8. lowercase
         final_sent = final_sent.lower()
 

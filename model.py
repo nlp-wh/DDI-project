@@ -40,6 +40,7 @@ class CNN(object):
                  max_sent_len,
                  vocb,
                  emb_dim=100,
+                 pos_dim=10,
                  kernel_lst=[3, 4, 5],
                  nb_filters=100,
                  dropout_rate=0.2,
@@ -50,6 +51,7 @@ class CNN(object):
         self.max_sent_len = max_sent_len
         self.vocb = vocb
         self.emb_dim = emb_dim
+        self.pos_dim = pos_dim
         self.kernel_lst = kernel_lst
         self.nb_filters = nb_filters
         self.dropout_rate = dropout_rate
@@ -68,6 +70,7 @@ class CNN(object):
 
     def add_input_layer(self):
         self.input_x = Input(shape=(self.max_sent_len,), dtype='int32')
+        self.input_pos = Input(shape=(self.max_sent_len,), dtype='int32')
 
     def add_embedding_layer(self):
         # If static, trainable = False. If non-static, trainable = True
@@ -82,11 +85,17 @@ class CNN(object):
             self.w_emb = Embedding(input_dim=len(self.vocb), output_dim=self.emb_dim,
                                    input_length=self.max_sent_len, trainable=self.non_static)(self.input_x)
 
+        # Position Embedding (0, 1, 2)
+        self.pos_emb = Embedding(input_dim=3, output_dim=self.pos_dim, input_length=self.max_sent_len, trainable=True)(self.input_pos)
+
+        # Concatenation
+        self.emb_concat = concatenate([self.w_emb, self.pos_emb])
+
     def add_cnn_layer(self):
         # CNN Parts
         layer_lst = []
         for kernel_size in self.kernel_lst:
-            conv_l = Conv1D(filters=self.nb_filters, kernel_size=kernel_size, padding='valid', activation='relu')(self.w_emb)
+            conv_l = Conv1D(filters=self.nb_filters, kernel_size=kernel_size, padding='valid', activation='relu')(self.emb_concat)
             pool_l = MaxPool1D(pool_size=self.max_sent_len - kernel_size + 1)(conv_l)
             drop_l = Dropout(self.dropout_rate)(pool_l)
             # Append the final result
@@ -97,10 +106,10 @@ class CNN(object):
     def add_fc_layer(self):
         self.concat_drop_l = Dropout(self.dropout_rate)(self.concat_l)
         self.flat_l = Flatten()(self.concat_drop_l)
-        self.pred_output = Dense(1, activation='sigmoid')(self.flat_l)
+        self.pred_output = Dense(4, activation='softmax')(self.flat_l)
 
     def compile_model(self):
-        self.model = Model(inputs=self.input_x, outputs=self.pred_output)
+        self.model = Model(inputs=[self.input_x, self.input_pos], outputs=self.pred_output)
         # Optimizer
         if self.optimizer.lower() == 'adam':
             opt = Adam(lr=self.lr_rate)
@@ -113,7 +122,7 @@ class CNN(object):
         else:
             raise ValueError("Use Optimizer in Adam, RMSProp, Adagrad, Adadelta!")
         # Model compile
-        self.model.compile(loss='binary_crossentropy',
+        self.model.compile(loss='categorical_crossentropy',
                            optimizer=opt,
                            metrics=['accuracy'])
 
@@ -124,7 +133,7 @@ class CNN(object):
             json_file.write(model_json)
         print('Save model.json')
 
-    def train(self, x_train, y_train, nb_epoch, batch_size, validation_split, save_weights=False):
+    def train(self, sentence, pos_lst, y, nb_epoch, batch_size, validation_split, save_weights=False):
         # Write log
         logging.basicConfig(filename=os.path.join(result_dir, 'cnn.log'),
                             level=logging.DEBUG, format='%(asctime)s %(levelname)-8s %(message)s',
@@ -137,7 +146,7 @@ class CNN(object):
         max_val_acc = 0
         for i in range(nb_epoch):
             # Training
-            train_history = self.model.fit(x_train, y_train, epochs=1, batch_size=batch_size, verbose=1, validation_split=validation_split)
+            train_history = self.model.fit(x=[sentence, pos_lst], y=y, epochs=1, batch_size=batch_size, verbose=1, validation_split=validation_split)
             # Writing the log
             train_loss = train_history.history['loss'][0]
             train_acc = train_history.history['acc'][0]
@@ -171,6 +180,7 @@ class MCCNN(CNN):
                  max_sent_len,
                  vocb,
                  emb_dim=100,
+                 pos_dim=10,
                  kernel_lst=[3, 4, 5],
                  nb_filters=100,
                  dropout_rate=0.2,
@@ -180,6 +190,7 @@ class MCCNN(CNN):
         self.max_sent_len = max_sent_len
         self.vocb = vocb
         self.emb_dim = emb_dim
+        self.pos_dim = pos_dim
         self.kernel_lst = kernel_lst
         self.nb_filters = nb_filters
         self.dropout_rate = dropout_rate
@@ -204,6 +215,12 @@ class MCCNN(CNN):
                                           input_length=self.max_sent_len, trainable=False)(self.input_x)
             self.w_emb_non_static = Embedding(input_dim=len(self.vocb), output_dim=self.emb_dim,
                                               input_length=self.max_sent_len, trainable=True)(self.input_x)
+        # Position Embedding (0, 1, 2)
+        self.pos_emb = Embedding(input_dim=3, output_dim=self.pos_dim, input_length=self.max_sent_len, trainable=True)(self.input_pos)
+
+        # Concatenation
+        self.w_emb_static_concat = concatenate([self.w_emb_static, self.pos_emb])
+        self.w_emb_non_static_concat = concatenate([self.w_emb_non_static, self.pos_emb])
 
     def add_cnn_layer(self):
         # CNN Parts
@@ -213,10 +230,10 @@ class MCCNN(CNN):
             conv_layer = Conv1D(filters=self.nb_filters, kernel_size=kernel_size, padding='valid', activation='relu')
             pool_layer = MaxPool1D(pool_size=self.max_sent_len - kernel_size + 1)
             # Static layer
-            conv_static = conv_layer(self.w_emb_static)
+            conv_static = conv_layer(self.w_emb_static_concat)
             pool_static = pool_layer(conv_static)
             # Non-static layer
-            conv_non_static = conv_layer(self.w_emb_non_static)
+            conv_non_static = conv_layer(self.w_emb_non_static_concat)
             pool_non_static = pool_layer(conv_non_static)
             # Add two layer
             add_l = add([pool_static, pool_non_static])

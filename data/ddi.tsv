@@ -1016,7 +1016,6 @@ DDI-DrugBank.d236.s1.p5	sodium acid phosphate	None	drug	amphetamine	DB00182	True
 DDI-DrugBank.d236.s14.p2	Amphetamines	None	group	antihistamines	None	True	effect	group	Antihistamines: Amphetamines may counteract the sedative effect of antihistamines.
 DDI-DrugBank.d236.s25.p2	Amphetamines	None	group	phenytoin	DB00252	True	mechanism	drug	Phenytoin: Amphetamines may delay intestinal absorption of phenytoin;
 DDI-DrugBank.d236.s27.p2	propoxyphene	None	drug	amphetamine	DB00182	True	effect	group	Propoxyphene: In cases of propoxyphene overdosage, amphetamine CNS stimulation is potentiated and fatal convulsions can occur.
-DDI-DrugBank.d236.s29.p0	Amphetamines	None	group	corticosteroid	None	True	None	group	Drug/Laboratory Test Interactions: Amphetamines can cause a significant elevation in plasma corticosteroid levels.
 DDI-DrugBank.d236.s5.p1	acetazolamide	DB00819	drug	amphetamine	DB00182	True	mechanism	drug	Urinary alkalinizing agents (acetazolamide, some thiazides) increase the concentration of the non-ionized species of the amphetamine molecule, thereby decreasing urinary excretion.
 DDI-DrugBank.d236.s7.p7	Amphetamines	None	group	tricyclic	None	True	effect	group	Antidepressants, tricyclic: Amphetamines may enhance the activity of tricyclic or sympathomimetic agents;
 DDI-DrugBank.d236.s7.p8	Amphetamines	None	group	sympathomimetic agents	None	True	effect	group	Antidepressants, tricyclic: Amphetamines may enhance the activity of tricyclic or sympathomimetic agents;

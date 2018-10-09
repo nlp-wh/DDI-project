@@ -5,47 +5,69 @@ import numpy as np
 import os
 
 data_dir = 'data'
-train_filename = 'train'
+train_filename = 'train.tsv'
 vocab_filename = 'vocab'
+
+# Check whether the data file exists
+if not os.path.exists(os.path.join(data_dir, train_filename)):
+    raise FileNotFoundError("[{}] file not found".format(train_filename))
+
+
+rel_class = {'advise': 0, 'effect': 1, 'mechanism': 2, 'int': 3}
 
 
 def load_sentence():
     sentences = []
-    drugs = []
-    effects = []
+    drug1_lst = []
+    drug2_lst = []
+    rel_lst = []
 
     with open(os.path.join(data_dir, train_filename), 'r', encoding='utf-8') as f:
+        line_num = 0
         for line in f:
-            item_lst = line.rstrip().split('\t')
-            sentences.append(item_lst[0].split(' '))
-            drugs.append(item_lst[1])
-            effects.append(item_lst[2])
+            item_lst = line.strip().split('\t')
+            drug1_lst.append(item_lst[0])
+            drug2_lst.append(item_lst[1])
+            rel_lst.append(rel_class[item_lst[2]])
+            sent = item_lst[3].split(' ')
+            for idx, token in enumerate(sent):
+                if token.find('druga') != -1:
+                    sent[idx] = token.replace('druga', drug1_lst[line_num])
+                elif token.find('drugb') != -1:
+                    sent[idx] = token.replace('drugb', drug2_lst[line_num])
+            sentences.append(sent)
+            line_num += 1
 
-    assert len(sentences) == len(drugs) == len(effects)
+    assert len(sentences) == len(drug1_lst) == len(drug2_lst) == len(rel_lst)
     print('sentences[0]:', sentences[0])
-    print('drugs[0]:', drugs[0])
-    print('effects[0]:', effects[0])
-    return sentences, drugs, effects
+    print('drug1_lst[0]:', drug1_lst[0])
+    print('drug2_lst[0]:', drug2_lst[0])
+    print('rel_lst[0]:', rel_lst[0])
+    return sentences, drug1_lst, drug2_lst, rel_lst
 
 
-def find_drug_effect_in_sentence(sentences, drugs, effects):
+def find_drug1_drug2_in_sentence(sentences, drug1_lst, drug2_lst):
     '''
     0:None
-    1:Drug
-    2:Effect
+    1:Drug1
+    2:Drug2
     '''
     entity_pos_lst = []
     for idx, sentence in enumerate(sentences):
         entity_in_sent = []
-        drug = drugs[idx]
-        effect = effects[idx]
+        drug1 = drug1_lst[idx]
+        drug2 = drug2_lst[idx]
         for word in sentence:
-            if word == drug:
+            if word == drug1:
                 entity_in_sent.append(1)
-            elif word == effect:
+            elif word == drug2:
                 entity_in_sent.append(2)
             else:
                 entity_in_sent.append(0)
+        # entity_in_sent 안에 1과 2이 하나씩 있는지 확인
+        # if entity_in_sent.count(1) != 1 or entity_in_sent.count(2) != 1:
+        #     print(entity_in_sent)
+        #     print(sentences[idx])
         entity_pos_lst.append(entity_in_sent)
     print('entity_pos_lst[0]:', entity_pos_lst[0])
 
@@ -126,20 +148,24 @@ def load_word_matrix(vocb, emb_dim=100, unk_limit=10000):
     return word_matrix
 
 
-def pad_sequence(sentences2idx, max_sent_len=50):
-    return pad_sequences(sentences2idx, padding='post', maxlen=max_sent_len)
+def pad_sequence(seq, max_sent_len=50):
+    return pad_sequences(seq, padding='post', maxlen=max_sent_len)
 
 
-def load_data(unk_limit=10000, max_sent_len=50):
-    sentences, drugs, effects = load_sentence()
-    entity_pos_lst = find_drug_effect_in_sentence(sentences, drugs, effects)
+def one_hot_encoding(rel_lst):
+    return keras.utils.to_categorical(rel_lst, num_classes=len(rel_class))
+
+
+def load_data(unk_limit=5000, max_sent_len=50):
+    sentences, drug1_lst, drug2_lst, rel_lst = load_sentence()
+    entity_pos_lst = find_drug1_drug2_in_sentence(sentences, drug1_lst, drug2_lst)
+    entity_pos_lst = pad_sequence(entity_pos_lst, max_sent_len=max_sent_len)
     vocb, vocb_inv = build_word_vocab(sentences)
     sentences2idx = word2idx(sentences, vocb, unk_limit=unk_limit)
     sentences2idx = pad_sequence(sentences2idx, max_sent_len=max_sent_len)
-    y = [1] * len(sentences)
-    y = np.asarray(y)
-
-    return sentences2idx, entity_pos_lst, y, vocb, vocb_inv
+    y = one_hot_encoding(rel_lst)
+    print('y[0]:', y[0])
+    return (sentences2idx, entity_pos_lst, y), (vocb, vocb_inv), (sentences, drug1_lst, drug2_lst, rel_lst)
 
 
 if __name__ == '__main__':
