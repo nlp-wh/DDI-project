@@ -5,6 +5,7 @@ import numpy as np
 import os
 
 data_dir = 'data'
+word2vec_dir = 'word2vec'
 train_filename = 'train.tsv'
 vocab_filename = 'vocab'
 
@@ -64,7 +65,6 @@ def find_drug1_drug2_in_sentence(sentences, drug1_lst, drug2_lst):
                 entity_in_sent.append(2)
             else:
                 entity_in_sent.append(0)
-        # entity_in_sent 안에 1과 2이 하나씩 있는지 확인
         # if entity_in_sent.count(1) != 1 or entity_in_sent.count(2) != 1:
         #     print(entity_in_sent)
         #     print(sentences[idx])
@@ -127,7 +127,11 @@ def word2idx(sentences, vocb, unk_limit=10000):
 
 def load_word_matrix(vocb, emb_dim=100, unk_limit=10000):
     embedding_index = dict()
-    with open(os.path.join(data_dir, 'glove.6B.{}d.txt'.format(emb_dim)), 'r', encoding='utf-8') as f:
+    file_name = 'glove.6B.{}d.txt'.format(emb_dim)
+    vec_file_name = os.path.join(word2vec_dir, file_name)
+    if not os.path.exists(vec_file_name):
+        raise FileNotFoundError(vec_file_name + ' not found')
+    with open(vec_file_name, 'r', encoding='utf-8') as f:
         for line in f:
             line = line.rstrip()
             values = line.split()
@@ -142,9 +146,9 @@ def load_word_matrix(vocb, emb_dim=100, unk_limit=10000):
             if embedding_vector is not None:
                 word_matrix[i] = embedding_vector
             else:
-                word_matrix[i] = np.random.uniform(-1, 1, emb_dim)
+                word_matrix[i] = np.random.uniform(-1.0, 1.0, emb_dim)
                 cnt += 1
-    print('{} words not in glove'.format(cnt))
+    print('{} words not in word vector'.format(cnt))
     return word_matrix
 
 

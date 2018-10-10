@@ -8,6 +8,7 @@ import sys
 import logging
 
 from metrics import recall, precision, f1, calculate_metrics
+from load_data_ddi import load_word_matrix
 
 # Make the directory for saving model, weight, log
 result_dir = 'result'
@@ -15,26 +16,26 @@ if not os.path.exists(result_dir):
     os.mkdir(result_dir)
 
 
-def load_word_matrix(vocb, emb_dim):
-    embedding_index = dict()
-    with open('glove.6B.{}d.txt'.format(emb_dim), 'r', encoding='utf-8') as f:
-        for line in f:
-            line = line.rstrip()
-            values = line.split()
-            word = values[0]
-            coefs = np.asarray(values[1:], dtype='float32')
-            embedding_index[word] = coefs
-    word_matrix = np.zeros((len(vocb), emb_dim))
-    cnt = 0
-    for word, i in vocb.items():
-        embedding_vector = embedding_index.get(word)
-        if embedding_vector is not None:
-            word_matrix[i] = embedding_vector
-        else:
-            word_matrix[i] = np.random.uniform(-1.0, 1.0, emb_dim)
-            cnt += 1
-    print('{} words not in glove'.format(cnt))
-    return word_matrix
+# def load_word_matrix(vocb, emb_dim):
+#     embedding_index = dict()
+#     with open('glove.6B.{}d.txt'.format(emb_dim), 'r', encoding='utf-8') as f:
+#         for line in f:
+#             line = line.rstrip()
+#             values = line.split()
+#             word = values[0]
+#             coefs = np.asarray(values[1:], dtype='float32')
+#             embedding_index[word] = coefs
+#     word_matrix = np.zeros((len(vocb), emb_dim))
+#     cnt = 0
+#     for word, i in vocb.items():
+#         embedding_vector = embedding_index.get(word)
+#         if embedding_vector is not None:
+#             word_matrix[i] = embedding_vector
+#         else:
+#             word_matrix[i] = np.random.uniform(-1.0, 1.0, emb_dim)
+#             cnt += 1
+#     print('{} words not in glove'.format(cnt))
+#     return word_matrix
 
 
 class CNN(object):
@@ -49,7 +50,8 @@ class CNN(object):
                  optimizer='adam',
                  lr_rate=0.001,
                  non_static=True,
-                 use_pretrained=False):
+                 use_pretrained=False,
+                 unk_limit=10000):
         self.max_sent_len = max_sent_len
         self.vocb = vocb
         self.emb_dim = emb_dim
@@ -61,6 +63,7 @@ class CNN(object):
         self.lr_rate = lr_rate
         self.non_static = non_static
         self.use_pretrained = use_pretrained
+        self.unk_limit = unk_limit
         self.build_model()
 
     def build_model(self):
@@ -78,7 +81,7 @@ class CNN(object):
         # If static, trainable = False. If non-static, trainable = True
         if self.use_pretrained:
             # load word matrix
-            word_matrix = load_word_matrix(self.vocb, self.emb_dim)
+            word_matrix = load_word_matrix(self.vocb, self.emb_dim, self.unk_limit)
             # If static, trainable = False. If non-static, trainable = True
             self.w_emb = Embedding(input_dim=len(self.vocb), output_dim=self.emb_dim, input_length=self.max_sent_len,
                                    trainable=self.non_static, weights=[word_matrix])(self.input_x)
@@ -201,7 +204,8 @@ class MCCNN(CNN):
                  dropout_rate=0.2,
                  optimizer='adam',
                  lr_rate=0.001,
-                 use_pretrained=False):
+                 use_pretrained=False,
+                 unk_limit=10000):
         self.max_sent_len = max_sent_len
         self.vocb = vocb
         self.emb_dim = emb_dim
@@ -212,13 +216,14 @@ class MCCNN(CNN):
         self.optimizer = optimizer
         self.lr_rate = lr_rate
         self.use_pretrained = use_pretrained
+        self.unk_limit = unk_limit
         self.build_model()
 
     def add_embedding_layer(self):
         # If static, trainable = False. If non-static, trainable = True
         if self.use_pretrained:
             # load word matrix
-            word_matrix = load_word_matrix(self.vocb, self.emb_dim)
+            word_matrix = load_word_matrix(self.vocb, self.emb_dim, self.unk_limit)
             # If static, trainable = False. If non-static, trainable = True
             self.w_emb_static = Embedding(input_dim=len(self.vocb), output_dim=self.emb_dim, input_length=self.max_sent_len,
                                           trainable=False, weights=[word_matrix])(self.input_x)
@@ -270,7 +275,8 @@ class BILSTM(CNN):
                  optimizer='adam',
                  lr_rate=0.001,
                  non_static=True,
-                 use_pretrained=False):
+                 use_pretrained=False,
+                 unk_limit=10000):
         self.max_sent_len = max_sent_len
         self.vocb = vocb
         self.emb_dim = emb_dim
@@ -281,6 +287,7 @@ class BILSTM(CNN):
         self.lr_rate = lr_rate
         self.non_static = non_static
         self.use_pretrained = use_pretrained
+        self.unk_limit = unk_limit
         self.build_model()
 
     def build_model(self):
