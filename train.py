@@ -3,7 +3,7 @@ from model import CNN, MCCNN, BILSTM
 
 ########### Hyperparameter ###########
 # 1. Training settings
-train_mode = 'cnn'
+train_mode = 'lstm'
 nb_epoch = 10
 batch_size = 32
 learning_rate = 0.001
@@ -15,18 +15,20 @@ nb_filters = 16
 # 3. RNN specific
 rnn_dim = 100  # Dimension for output of LSTM
 
-# 4. Model common settings
+# 4. Model common settings  
 emb_dim = 50
 pos_dim = 10
 max_sent_len = 50
-unk_limit = 4000
+num_classes = 5
+unk_limit = 8000
 dropout_rate = 0.1
 ######################################
 
 
 if __name__ == '__main__':
-    (sentences2idx, entity_pos_lst, y), (vocb, vocb_inv), (sentences, drug1_lst,
-                                                           drug2_lst, rel_lst) = load_data(unk_limit=unk_limit, max_sent_len=max_sent_len)
+    (tr_sentences2idx, tr_entity_pos_lst, tr_y), (te_sentences2idx, te_entity_pos_lst, te_y), \
+        (vocb, vocb_inv), (tr_sentences, tr_drug1_lst, tr_drug2_lst, tr_rel_lst), (te_sentences,
+                                                                                   te_drug1_lst, te_drug2_lst, te_rel_lst) = load_data(unk_limit=unk_limit, max_sent_len=max_sent_len)
     if train_mode.lower() == 'cnn':
         model = CNN(max_sent_len=max_sent_len,
                     vocb=vocb,
@@ -39,7 +41,8 @@ if __name__ == '__main__':
                     non_static=True,
                     lr_rate=learning_rate,
                     use_pretrained=False,
-                    unk_limit=unk_limit)
+                    unk_limit=unk_limit,
+                    num_classes=num_classes)
 
     elif train_mode.lower() == 'mccnn':
         model = MCCNN(max_sent_len=max_sent_len,
@@ -52,7 +55,8 @@ if __name__ == '__main__':
                       optimizer='adam',
                       lr_rate=learning_rate,
                       use_pretrained=False,
-                      unk_limit=unk_limit)
+                      unk_limit=unk_limit,
+                      num_classes=num_classes)
 
     elif train_mode.lower() == 'lstm':
         model = BILSTM(max_sent_len=max_sent_len,
@@ -65,10 +69,12 @@ if __name__ == '__main__':
                        non_static=True,
                        lr_rate=0.001,
                        use_pretrained=False,
-                       unk_limit=unk_limit)
+                       unk_limit=unk_limit,
+                       num_classes=num_classes)
 
     else:
         raise Exception("Wrong Training Model")
     model.show_model_summary()
     model.save_model()
-    model.train(sentence=sentences2idx, pos_lst=entity_pos_lst, y=y, nb_epoch=nb_epoch, batch_size=batch_size, validation_split=0.2)
+    model.train(sentence=tr_sentences2idx, pos_lst=tr_entity_pos_lst, y=tr_y, nb_epoch=nb_epoch, batch_size=batch_size, validation_split=0.2)
+    model.evaluate(x_test=[te_sentences2idx, te_entity_pos_lst], y_test=te_y, batch_size=batch_size)

@@ -16,32 +16,11 @@ if not os.path.exists(result_dir):
     os.mkdir(result_dir)
 
 
-# def load_word_matrix(vocb, emb_dim):
-#     embedding_index = dict()
-#     with open('glove.6B.{}d.txt'.format(emb_dim), 'r', encoding='utf-8') as f:
-#         for line in f:
-#             line = line.rstrip()
-#             values = line.split()
-#             word = values[0]
-#             coefs = np.asarray(values[1:], dtype='float32')
-#             embedding_index[word] = coefs
-#     word_matrix = np.zeros((len(vocb), emb_dim))
-#     cnt = 0
-#     for word, i in vocb.items():
-#         embedding_vector = embedding_index.get(word)
-#         if embedding_vector is not None:
-#             word_matrix[i] = embedding_vector
-#         else:
-#             word_matrix[i] = np.random.uniform(-1.0, 1.0, emb_dim)
-#             cnt += 1
-#     print('{} words not in glove'.format(cnt))
-#     return word_matrix
-
-
 class CNN(object):
     def __init__(self,
                  max_sent_len,
                  vocb,
+                 num_classes,
                  emb_dim=100,
                  pos_dim=10,
                  kernel_lst=[3, 4, 5],
@@ -64,6 +43,7 @@ class CNN(object):
         self.non_static = non_static
         self.use_pretrained = use_pretrained
         self.unk_limit = unk_limit
+        self.num_classes = num_classes
         self.build_model()
 
     def build_model(self):
@@ -111,7 +91,7 @@ class CNN(object):
     def add_fc_layer(self):
         self.concat_drop_l = Dropout(self.dropout_rate)(self.concat_l)
         self.flat_l = Flatten()(self.concat_drop_l)
-        self.pred_output = Dense(4, activation='softmax')(self.flat_l)
+        self.pred_output = Dense(self.num_classes, activation='softmax')(self.flat_l)
 
     def compile_model(self):
         self.model = Model(inputs=[self.input_x, self.input_pos], outputs=self.pred_output)
@@ -129,7 +109,7 @@ class CNN(object):
         # Model compile
         self.model.compile(loss='categorical_crossentropy',
                            optimizer=opt,
-                           metrics=[f1, precision, recall, 'accuracy'])
+                           metrics=['accuracy', precision, recall, f1])
 
     def save_model(self):
         # Save the model into the result directory
@@ -140,7 +120,7 @@ class CNN(object):
 
     def train(self, sentence, pos_lst, y, nb_epoch, batch_size, validation_split, save_weights=False):
         # Write log
-        logging.basicConfig(filename=os.path.join(result_dir, 'cnn.log'),
+        logging.basicConfig(filename=os.path.join(result_dir, 'result.log'),
                             level=logging.DEBUG, format='%(asctime)s %(levelname)-8s %(message)s',
                             datefmt='%Y-%m-%d %H:%M:%S', filemode='a')
         logger = logging.getLogger()
@@ -148,7 +128,7 @@ class CNN(object):
         logger.info('')
         logger.info("#################################### New Start #####################################")
 
-        max_val_acc = 0
+        max_val_f1 = 0
         for i in range(nb_epoch):
             # Training
             train_history = self.model.fit(x=[sentence, pos_lst], y=y, epochs=1, batch_size=batch_size, verbose=1, validation_split=validation_split)
@@ -177,8 +157,8 @@ class CNN(object):
                                                                                                                               val_r,
                                                                                                                               val_f1))
             # Saving the weight if it is better than before (early-stopping)
-            if max_val_acc < val_acc:
-                max_val_acc = val_acc
+            if max_val_f1 < val_f1:
+                max_val_f1 = val_f1
                 logging.info("[{}th epoch, Better performance! Update the weight!]".format(i + 1))
                 self.model.save_weights(os.path.join(result_dir, 'weights.h5'))
 
@@ -187,7 +167,11 @@ class CNN(object):
         pred_test = self.model.evaluate(x_test, y_test, batch_size=batch_size, verbose=1)
         logger = logging.getLogger()
         logger.info(
-            '##test##,  test_loss: {:.4f}, test_acc: {:.4f}'.format(pred_test[0], pred_test[1]))
+            '##test##,  loss: {:.4f}, acc: {:.4f}, prec: {:.4f}, recall: {:.4f}, F1: {:.4f}'.format(pred_test[0],
+                                                                                                    pred_test[1],
+                                                                                                    pred_test[2],
+                                                                                                    pred_test[3],
+                                                                                                    pred_test[4],))
 
     def show_model_summary(self):
         print(self.model.summary())
@@ -197,6 +181,7 @@ class MCCNN(CNN):
     def __init__(self,
                  max_sent_len,
                  vocb,
+                 num_classes,
                  emb_dim=100,
                  pos_dim=10,
                  kernel_lst=[3, 4, 5],
@@ -208,6 +193,7 @@ class MCCNN(CNN):
                  unk_limit=10000):
         self.max_sent_len = max_sent_len
         self.vocb = vocb
+        self.num_classes = num_classes
         self.emb_dim = emb_dim
         self.pos_dim = pos_dim
         self.kernel_lst = kernel_lst
@@ -268,6 +254,7 @@ class BILSTM(CNN):
     def __init__(self,
                  max_sent_len,
                  vocb,
+                 num_classes,
                  emb_dim=100,
                  pos_dim=10,
                  rnn_dim=100,
@@ -279,6 +266,7 @@ class BILSTM(CNN):
                  unk_limit=10000):
         self.max_sent_len = max_sent_len
         self.vocb = vocb
+        self.num_classes = num_classes
         self.emb_dim = emb_dim
         self.pos_dim = pos_dim
         self.rnn_dim = rnn_dim
@@ -303,4 +291,4 @@ class BILSTM(CNN):
 
     def add_fc_layer(self):
         self.flat_l = Flatten()(self.rnn_l)
-        self.pred_output = Dense(4, activation='softmax')(self.flat_l)
+        self.pred_output = Dense(self.num_classes, activation='softmax')(self.flat_l)
