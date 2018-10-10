@@ -1,4 +1,5 @@
 import numpy as np
+import keras
 from keras.layers import Dense, Conv1D, MaxPool1D, Flatten, Dropout, Activation, Embedding, Input, concatenate, add, Bidirectional, LSTM
 from keras import Model, regularizers
 from keras.optimizers import Adam, Adadelta, RMSprop, Adagrad
@@ -9,6 +10,7 @@ import logging
 
 from metrics import recall, precision, f1, calculate_metrics
 from load_data_ddi import load_word_matrix
+from seq_self_attention import SeqSelfAttention
 
 # Make the directory for saving model, weight, log
 result_dir = 'result'
@@ -174,7 +176,7 @@ class CNN(object):
                                                                                                     pred_test[4],))
 
     def show_model_summary(self):
-        print(self.model.summary())
+        print(self.model.summary(line_length=100))
 
 
 class MCCNN(CNN):
@@ -263,7 +265,8 @@ class BILSTM(CNN):
                  lr_rate=0.001,
                  non_static=True,
                  use_pretrained=False,
-                 unk_limit=10000):
+                 unk_limit=10000,
+                 use_self_att=False):
         self.max_sent_len = max_sent_len
         self.vocb = vocb
         self.num_classes = num_classes
@@ -276,18 +279,33 @@ class BILSTM(CNN):
         self.non_static = non_static
         self.use_pretrained = use_pretrained
         self.unk_limit = unk_limit
+        self.use_self_att = use_self_att
         self.build_model()
 
     def build_model(self):
         self.add_input_layer()
         self.add_embedding_layer()
         self.add_rnn_layer()
-        self.add_fc_layer()
+        if self.use_self_att:
+            self.add_self_att_layer()
+        else:
+            self.add_fc_layer()
         self.compile_model()
 
     def add_rnn_layer(self):
         self.rnn_l = Bidirectional(LSTM(self.rnn_dim, dropout=self.dropout_rate,
                                         recurrent_dropout=self.dropout_rate, return_sequences=True))(self.emb_concat)
+
+    def add_self_att_layer(self):
+        self.att_l = SeqSelfAttention(attention_activation='sigmoid')(self.rnn_l)
+        # self.att_l = SeqSelfAttention(attention_type=SeqSelfAttention.ATTENTION_TYPE_MUL,
+        #                         kernel_regularizer=keras.regularizers.l2(1e-4),
+        #                         bias_regularizer=keras.regularizers.l1(1e-4),
+        #                         attention_regularizer_weight=1e-4,
+        #                         name='Attention')(self.rnn_l)
+        self.flat_l = Flatten()(self.att_l)
+        self.dense_1000_l = Dense(1000)(self.flat_l)
+        self.pred_output = Dense(self.num_classes, activation='softmax')(self.dense_1000_l)
 
     def add_fc_layer(self):
         self.flat_l = Flatten()(self.rnn_l)

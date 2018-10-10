@@ -3,25 +3,28 @@ from model import CNN, MCCNN, BILSTM
 
 ########### Hyperparameter ###########
 # 1. Training settings
-train_mode = 'lstm'
-nb_epoch = 10
-batch_size = 32
+train_mode = 'rnn'
+nb_epoch = 15
+batch_size = 200
 learning_rate = 0.001
 
 # 2. CNN specific
 kernel_lst = [3, 4, 5]
-nb_filters = 16
+nb_filters = 64
 
 # 3. RNN specific
-rnn_dim = 100  # Dimension for output of LSTM
+rnn_dim = 200  # Dimension for output of LSTM
 
-# 4. Model common settings  
-emb_dim = 50
-pos_dim = 10
+# 4. Model common settings
+emb_dim = 200
+pos_dim = 20
 max_sent_len = 50
 num_classes = 5
 unk_limit = 8000
 dropout_rate = 0.1
+
+# 5. Self attention
+use_self_att = True
 ######################################
 
 
@@ -58,7 +61,7 @@ if __name__ == '__main__':
                       unk_limit=unk_limit,
                       num_classes=num_classes)
 
-    elif train_mode.lower() == 'lstm':
+    elif train_mode.lower() == 'rnn':
         model = BILSTM(max_sent_len=max_sent_len,
                        vocb=vocb,
                        emb_dim=emb_dim,
@@ -70,7 +73,8 @@ if __name__ == '__main__':
                        lr_rate=0.001,
                        use_pretrained=False,
                        unk_limit=unk_limit,
-                       num_classes=num_classes)
+                       num_classes=num_classes,
+                       use_self_att=use_self_att)
 
     else:
         raise Exception("Wrong Training Model")
