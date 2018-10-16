@@ -42,11 +42,13 @@ def load_sentence(filename):
             # Before Replacing, build positing list!!
             entity_pos_lst.append(build_position_lst(sent))
             # Then replace drug name
+            '''
             for idx, token in enumerate(sent):
                 if token.find('druga') != -1:
                     sent[idx] = token.replace('druga', drug1_lst[line_num])
                 elif token.find('drugb') != -1:
                     sent[idx] = token.replace('drugb', drug2_lst[line_num])
+            '''
             sentences.append(sent)
             line_num += 1
 
@@ -108,6 +110,7 @@ def build_position_lst(sentence):
 
 
 def build_word_vocab(sentences):
+    '''
     if os.path.exists(os.path.join(data_dir, vocab_filename)):
         vocb = {}
         vocb_inv = {}
@@ -118,27 +121,28 @@ def build_word_vocab(sentences):
                 vocb[w] = idx
                 vocb_inv[idx] = w
     else:
-        words = []
-        for sentence in sentences:
-            words.extend(sentence)
+    '''
+    words = []
+    for sentence in sentences:
+        words.extend(sentence)
 
-        word_counts = Counter(words)
-        vocb_lst = [x[0] for x in word_counts.most_common()]
+    word_counts = Counter(words)
+    vocb_lst = [x[0] for x in word_counts.most_common()]
 
-        vocb = dict()
-        vocb['<PAD>'] = 0
-        vocb['<GO>'] = 1
-        vocb['<UNK>'] = 2
-        for idx, w in enumerate(vocb_lst):
-            vocb[w] = idx + 3
-        print('vocb_len', len(vocb))
-        print('vocb_lst[0]', vocb_lst[0])
-        print('vocb_lst[1]', vocb_lst[1])
-        vocb_inv = {idx: w for w, idx in vocb.items()}
-        # Save vocb
-        with open(os.path.join(data_dir, vocab_filename), 'w', encoding='utf-8') as f:
-            for w, idx in vocb.items():
-                f.write("{}\t{}\n".format(idx, w))
+    vocb = dict()
+    vocb['<PAD>'] = 0
+    vocb['<GO>'] = 1
+    vocb['<UNK>'] = 2
+    for idx, w in enumerate(vocb_lst):
+        vocb[w] = idx + 3
+    print('vocb_len', len(vocb))
+    print('vocb_lst[0]', vocb_lst[0])
+    print('vocb_lst[1]', vocb_lst[1])
+    vocb_inv = {idx: w for w, idx in vocb.items()}
+    # Save vocb
+    with open(os.path.join(data_dir, vocab_filename), 'w', encoding='utf-8') as f:
+        for w, idx in vocb.items():
+            f.write("{}\t{}\n".format(idx, w))
     return vocb, vocb_inv
 
 
