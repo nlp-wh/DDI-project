@@ -4,10 +4,10 @@ from model import CNN, MCCNN, BILSTM
 ########### Hyperparameter ###########
 # 1. Training settings
 train_mode = 'cnn'
-nb_epoch = 15
-batch_size = 50
+nb_epoch = 10
+batch_size = 200
 learning_rate = 0.001
-optimizer = 'adadelta'
+optimizer = 'adam'
 use_pretrained = False
 
 # 2. CNN specific
@@ -15,7 +15,7 @@ kernel_lst = [3, 4, 5]  # [3, 4, 5]
 nb_filters = 200
 
 # 3. RNN specific
-rnn_dim = 200  # Dimension for output of LSTM
+rnn_dim = 300  # Dimension for output of LSTM
 
 # 4. Model common settings
 emb_dim = 300
@@ -83,4 +83,4 @@ if __name__ == '__main__':
     model.show_model_summary()
     model.save_model()
     model.train(sentence=tr_sentences2idx, pos_lst=tr_entity_pos_lst, y=tr_y, nb_epoch=nb_epoch, batch_size=batch_size, validation_split=0.1)
-    model.evaluate(x_test=[te_sentences2idx, te_entity_pos_lst], y_test=te_y, batch_size=batch_size)
+    model.evaluate(sentence=te_sentences2idx, pos_lst=te_entity_pos_lst, y=te_y, batch_size=batch_size)

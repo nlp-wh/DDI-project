@@ -120,7 +120,7 @@ class CNN(object):
             json_file.write(model_json)
         print('Save model.json')
 
-    def train(self, sentence, pos_lst, y, nb_epoch, batch_size, validation_split, save_weights=False):
+    def train(self, sentence, pos_lst, y, nb_epoch, batch_size, validation_split):
         # Write log
         logging.basicConfig(filename=os.path.join(result_dir, 'result.log'),
                             level=logging.DEBUG, format='%(asctime)s %(levelname)-8s %(message)s',
@@ -164,9 +164,9 @@ class CNN(object):
                 logging.info("[{}th epoch, Better performance! Update the weight!]".format(i + 1))
                 self.model.save_weights(os.path.join(result_dir, 'weights.h5'))
 
-    def evaluate(self, x_test, y_test, batch_size):
+    def evaluate(self, sentence, pos_lst, y, batch_size):
         self.model.load_weights(os.path.join(result_dir, 'weights.h5'))
-        pred_test = self.model.evaluate(x_test, y_test, batch_size=batch_size, verbose=1)
+        pred_test = self.model.evaluate(x=[sentence, pos_lst], y=y, batch_size=batch_size, verbose=1)
         logger = logging.getLogger()
         logger.info(
             '##test##,  loss: {:.4f}, acc: {:.4f}, prec: {:.4f}, recall: {:.4f}, F1: {:.4f}'.format(pred_test[0],
