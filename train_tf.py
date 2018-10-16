@@ -2,6 +2,8 @@ from load_data_ddi import load_data
 from model_tf import CNN, batch_loader
 import tensorflow as tf
 import sys
+from tqdm import tqdm
+import numpy as np
 
 ########### Hyperparameter ###########
 # 1. Training settings
@@ -59,11 +61,22 @@ if __name__ == '__main__':
     for i in range(nb_epoch):
         train_data = list(zip(tr_sentences2idx, tr_entity_pos_lst, tr_y))
         train_batches = batch_loader(train_data, batch_size, shuffle=True)
-        for batch in train_batches:
-            batch_x, batch_pos, batch_y = zip(*batch)
+        training_iterations = tqdm(range(0, len(tr_sentences2idx), batch_size), unit='B', unit_scale=True)
+        for j in training_iterations:
+            batch_x, batch_pos, batch_y = zip(*next(train_batches))
             step, loss, acc = model.train(sess=sess, sentence=batch_x, pos_lst=batch_pos, y=batch_y,
                                           dropout_keep_prob=dropout_keep_prob)
-            print("epoch: {}, loss: {:.4f}, acc: {:.4f}".format(i + 1, loss, acc))
+            tqdm.write("epoch: {}, loss: {:.4f}, acc: {:.4f}".format(i + 1, loss, acc))
+
+    # Training
+    # for i in range(nb_epoch):
+    #     train_data = list(zip(tr_sentences2idx, tr_entity_pos_lst, tr_y))
+    #     train_batches = batch_loader(train_data, batch_size, shuffle=True)
+    #     for batch in train_batches:
+    #         batch_x, batch_pos, batch_y = zip(*batch)
+    #         step, loss, acc = model.train(sess=sess, sentence=batch_x, pos_lst=batch_pos, y=batch_y,
+    #                                       dropout_keep_prob=dropout_keep_prob)
+    #         print("epoch: {}, loss: {:.4f}, acc: {:.4f}".format(i + 1, loss, acc))
 
     # Evaluation
     # model.evaluate(sess=sess, sentence=te_sentences2idx, pos_lst=te_entity_pos_lst, y=te_y)
