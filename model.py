@@ -9,7 +9,7 @@ import sys
 import logging
 
 from metrics import recall, precision, f1, calculate_metrics
-from load_data_ddi import load_word_matrix
+from load_data_ddi import load_word_matrix, load_test_pair_id
 from seq_self_attention import SeqSelfAttention
 
 # Make the directory for saving model, weight, log
@@ -197,6 +197,14 @@ class CNN(object):
         print(one_hot.shape)
         print(one_hot[:5])
         return one_hot
+
+    def make_output_file(self, y_pred):
+        pair_id_lst = load_test_pair_id()
+        with open('output.tsv', 'w', encoding='utf-8') as f:
+            assert len(y_pred) == len(pair_id_lst)
+            for pair_id, y in zip(pair_id_lst, y_pred): 
+                line = "{}\t{}\t{}\n".format("DDI2013", pair_id, y)
+                f.write(line)
 
 
 class MCCNN(CNN):

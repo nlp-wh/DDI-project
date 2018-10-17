@@ -6,24 +6,24 @@ import numpy as np
 
 ########### Hyperparameter ###########
 # 1. Training settings
-train_mode = 'cnn'
-nb_epoch = 3
+train_mode = 'rnn'
+nb_epoch = 10
 batch_size = 200
 learning_rate = 0.001
 optimizer = 'adam'
 use_pretrained = False
 
 # 2. CNN specific
-kernel_lst = [3, 4, 5]  # [3, 4, 5]
+kernel_lst = [4, 5, 6, 7, 8, 9, 10]  # [3, 4, 5]
 nb_filters = 200
 
 # 3. RNN specific
-rnn_dim = 300  # Dimension for output of LSTM
+rnn_dim = 200  # Dimension for output of LSTM
 
 # 4. Model common settings
-emb_dim = 300
+emb_dim = 200
 pos_dim = 10
-max_sent_len = 150
+max_sent_len = 100
 num_classes = 5
 unk_limit = 8000
 dropout_rate = 0.5
@@ -92,6 +92,13 @@ if __name__ == '__main__':
     # print(calculate_metrics(te_y, y_pred))
     print(te_y[:5])
     print(y_pred[:5])
-    print('f1_score micro:', f1_score(np.argmax(te_y, 1), np.argmax(y_pred, 1), average='micro'))
-    print('f1_score macro:', f1_score(np.argmax(te_y, 1), np.argmax(y_pred, 1), average='macro'))
-    print('f1_score weighted:', f1_score(np.argmax(te_y, 1), np.argmax(y_pred, 1), average='weighted'))
+    # print('f1_score micro:', f1_score(np.argmax(te_y, 1), np.argmax(y_pred, 1), [1, 2, 3, 4], average='micro'))
+    # print('f1_score macro:', f1_score(np.argmax(te_y, 1), np.argmax(y_pred, 1), [1, 2, 3, 4], average='macro'))
+    # print('f1_score weighted:', f1_score(np.argmax(te_y, 1), np.argmax(y_pred, 1), [1, 2, 3, 4], average='weighted'))
+
+    print('f1_score micro:', f1_score(te_y, y_pred, [1, 2, 3, 4], average='micro'))
+    print('f1_score macro:', f1_score(te_y, y_pred, [1, 2, 3, 4], average='macro'))
+    print('f1_score weighted:', f1_score(te_y, y_pred, [1, 2, 3, 4], average='weighted'))
+
+    # y_pred = np.argmax(y_pred, 1)
+    # model.make_output_file(y_pred)

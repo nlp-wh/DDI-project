@@ -15,7 +15,7 @@ if not os.path.exists(os.path.join(data_dir, train_filename)):
     raise FileNotFoundError("[{}] file not found".format(train_filename))
 
 
-rel_class = {'advise': 0, 'effect': 1, 'mechanism': 2, 'int': 3, 'false': 4}
+rel_class = {'false': 0, 'advise': 1, 'mechanism': 2, 'effect': 3, 'int': 4}
 
 '''
 Column
@@ -60,6 +60,14 @@ def load_sentence(filename):
     print('rel_lst[0]:', rel_lst[0])
     print('entity_pos_lst[0]:', entity_pos_lst[0])
     return sentences, drug1_lst, drug2_lst, rel_lst, entity_pos_lst
+
+
+def load_test_pair_id():
+    pair_id_lst = []
+    with open(os.path.join(data_dir, test_filename), 'r', encoding='utf-8') as f:
+        for line in f:
+            pair_id_lst.append(line.split('\t')[0])
+    return pair_id_lst
 
 
 def build_position_lst(sentence):
