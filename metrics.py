@@ -34,14 +34,22 @@ def f1(y_true, y_pred):
 
 
 def calculate_metrics(y_true_lst, y_pred_lst):
+    '''
     f, p, r, acc = [], [], [], []
     for y_true, y_pred in zip(y_true_lst, y_pred_lst):
-        f.append(f1_score(y_true, y_pred, labels=[0, 1]))
-        p.append(precision_score(y_true, y_pred, labels=[0, 1]))
-        r.append(recall_score(y_true, y_pred, labels=[0, 1]))
+        f.append(f1_score(y_true, y_pred))
+        p.append(precision_score(y_true, y_pred))
+        r.append(recall_score(y_true, y_pred))
         acc.append(accuracy_score(y_true, y_pred))
     f = np.average(f)
     p = np.average(p)
     r = np.average(r)
     acc = np.average(acc)
+    '''
+    y_true = np.argmax(y_true_lst, 1)
+    y_pred = np.argmax(y_pred_lst, 1)
+    f = f1_score(y_true, y_pred)
+    p = precision_score(y_true, y_pred)
+    r = recall_score(y_true, y_pred)
+    acc = accuracy_score(y_true, y_pred)
     return f, p, r, acc

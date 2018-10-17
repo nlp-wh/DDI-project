@@ -178,6 +178,26 @@ class CNN(object):
     def show_model_summary(self):
         print(self.model.summary(line_length=100))
 
+    def predict(self, sentence, pos_lst, batch_size, one_hot=True):
+        self.model.load_weights(os.path.join(result_dir, 'weights.h5'))
+        y_pred = self.model.predict(x=[sentence, pos_lst], batch_size=batch_size)
+        print(y_pred.shape)
+        print(y_pred[:5])
+        if one_hot:
+            return self.one_hot_encoding(y_pred)
+        else:
+            return y_pred
+
+    def one_hot_encoding(self, y_pred):
+        # Argmax
+        arg_maxed = np.argmax(y_pred, axis=1)
+        # One Hot encoding
+        one_hot = np.zeros((arg_maxed.size, self.num_classes))
+        one_hot[np.arange(arg_maxed.size), arg_maxed] = 1
+        print(one_hot.shape)
+        print(one_hot[:5])
+        return one_hot
+
 
 class MCCNN(CNN):
     def __init__(self,

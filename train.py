@@ -1,10 +1,13 @@
 from load_data_ddi import load_data
 from model import CNN, MCCNN, BILSTM
+from sklearn.metrics import f1_score
+from metrics import calculate_metrics, f1, precision, recall
+import numpy as np
 
 ########### Hyperparameter ###########
 # 1. Training settings
 train_mode = 'cnn'
-nb_epoch = 10
+nb_epoch = 3
 batch_size = 200
 learning_rate = 0.001
 optimizer = 'adam'
@@ -84,3 +87,11 @@ if __name__ == '__main__':
     model.save_model()
     model.train(sentence=tr_sentences2idx, pos_lst=tr_entity_pos_lst, y=tr_y, nb_epoch=nb_epoch, batch_size=batch_size, validation_split=0.1)
     model.evaluate(sentence=te_sentences2idx, pos_lst=te_entity_pos_lst, y=te_y, batch_size=batch_size)
+
+    y_pred = model.predict(sentence=te_sentences2idx, pos_lst=te_entity_pos_lst, batch_size=batch_size, one_hot=True)
+    # print(calculate_metrics(te_y, y_pred))
+    print(te_y[:5])
+    print(y_pred[:5])
+    print('f1_score micro:', f1_score(np.argmax(te_y, 1), np.argmax(y_pred, 1), average='micro'))
+    print('f1_score macro:', f1_score(np.argmax(te_y, 1), np.argmax(y_pred, 1), average='macro'))
+    print('f1_score weighted:', f1_score(np.argmax(te_y, 1), np.argmax(y_pred, 1), average='weighted'))
