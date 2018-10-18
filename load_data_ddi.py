@@ -1,5 +1,7 @@
-from tensorflow import keras
-from tensorflow.keras.preprocessing.sequence import pad_sequences
+import keras
+from keras.preprocessing.sequence import pad_sequences
+from sklearn.model_selection import train_test_split
+
 from collections import Counter
 import numpy as np
 import os
@@ -13,7 +15,6 @@ vocab_filename = 'vocab'
 # Check whether the data file exists
 if not os.path.exists(os.path.join(data_dir, train_filename)):
     raise FileNotFoundError("[{}] file not found".format(train_filename))
-
 
 rel_class = {'false': 0, 'advise': 1, 'mechanism': 2, 'effect': 3, 'int': 4}
 
@@ -205,9 +206,32 @@ def one_hot_encoding(rel_lst):
     return keras.utils.to_categorical(rel_lst, num_classes=len(rel_class))
 
 
+def train_dev_split(sentence, pos_lst, y, dev_size=0.1, shuffle=True):
+    zip_x = []
+    for s, p in zip(sentence, pos_lst):
+        zip_x.append((s, p))
+
+    X_train, X_dev, tr_y, de_y = train_test_split(zip_x, y, test_size=dev_size, shuffle=shuffle)
+    tr_sentence = []
+    tr_pos_lst = []
+    de_sentence = []
+    de_pos_lst = []
+    for item in X_train:
+        tr_sentence.append(item[0])
+        tr_pos_lst.append(item[1])
+    for item in X_dev:
+        de_sentence.append(item[0])
+        de_pos_lst.append(item[1])
+
+    assert len(tr_sentence) == len(tr_pos_lst) == len(tr_y)
+    assert len(de_sentence) == len(de_pos_lst) == len(de_y)
+
+    return (tr_sentence, tr_pos_lst, tr_y), (de_sentence, de_pos_lst, de_y)
+
+
 def load_data(unk_limit, max_sent_len):
-    tr_sentences, tr_drug1_lst, tr_drug2_lst, tr_rel_lst, tr_entity_pos_lst = load_sentence(train_filename)
-    te_sentences, te_drug1_lst, te_drug2_lst, te_rel_lst, te_entity_pos_lst = load_sentence(test_filename)
+    tr_sentences, tr_drug1_lst, tr_drug2_lst, tr_rel_lst, tr_pos_lst = load_sentence(train_filename)
+    te_sentences, te_drug1_lst, te_drug2_lst, te_rel_lst, te_pos_lst = load_sentence(test_filename)
 
     # Build vocab only with train data
     vocb, vocb_inv = build_word_vocab(tr_sentences)
@@ -220,16 +244,17 @@ def load_data(unk_limit, max_sent_len):
     tr_sentences2idx = pad_sequence(tr_sentences2idx, max_sent_len=max_sent_len)
     te_sentences2idx = pad_sequence(te_sentences2idx, max_sent_len=max_sent_len)
 
-    tr_entity_pos_lst = pad_sequence(tr_entity_pos_lst, max_sent_len=max_sent_len)
-    te_entity_pos_lst = pad_sequence(te_entity_pos_lst, max_sent_len=max_sent_len)
+    tr_pos_lst = pad_sequence(tr_pos_lst, max_sent_len=max_sent_len)
+    te_pos_lst = pad_sequence(te_pos_lst, max_sent_len=max_sent_len)
 
     # tr_y, te_y
     tr_y = one_hot_encoding(tr_rel_lst)
     te_y = one_hot_encoding(te_rel_lst)
     print('tr_y[0]:', tr_y[0])
     print('te_y[0]:', te_y[0])
-    return (tr_sentences2idx, tr_entity_pos_lst, tr_y), (te_sentences2idx, te_entity_pos_lst, te_y), \
-        (vocb, vocb_inv), (tr_sentences, tr_drug1_lst, tr_drug2_lst, tr_rel_lst), (te_sentences, te_drug1_lst, te_drug2_lst, te_rel_lst)
+    return (tr_sentences2idx, tr_pos_lst, tr_y), (te_sentences2idx, te_pos_lst, te_y), \
+           (vocb, vocb_inv), (tr_sentences, tr_drug1_lst, tr_drug2_lst, tr_rel_lst), (
+               te_sentences, te_drug1_lst, te_drug2_lst, te_rel_lst)
 
 
 if __name__ == '__main__':

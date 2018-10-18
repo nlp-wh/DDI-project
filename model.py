@@ -1,14 +1,13 @@
 import numpy as np
-import keras
-from keras.layers import Dense, Conv1D, MaxPool1D, Flatten, Dropout, Activation, Embedding, Input, concatenate, add, Bidirectional, LSTM
-from keras import Model, regularizers
+from keras.layers import Dense, Conv1D, MaxPool1D, Flatten, Dropout, Embedding, Input, concatenate, add, Bidirectional, LSTM
+from keras import Model
 from keras.optimizers import Adam, Adadelta, RMSprop, Adagrad
+from sklearn.metrics import f1_score, recall_score, precision_score
 
 import os
 import sys
 import logging
 
-from metrics import recall, precision, f1, calculate_metrics
 from load_data_ddi import load_word_matrix, load_test_pair_id
 from seq_self_attention import SeqSelfAttention
 
@@ -111,7 +110,7 @@ class CNN(object):
         # Model compile
         self.model.compile(loss='categorical_crossentropy',
                            optimizer=opt,
-                           metrics=['accuracy', precision, recall, f1])
+                           metrics=['accuracy'])
 
     def save_model(self):
         # Save the model into the result directory
@@ -120,7 +119,11 @@ class CNN(object):
             json_file.write(model_json)
         print('Save model.json')
 
-    def train(self, sentence, pos_lst, y, nb_epoch, batch_size, validation_split):
+    def train(self, nb_epoch, batch_size, train_data, dev_data):
+        # Unpack data
+        (tr_sentence2idx, tr_pos_lst, tr_y) = train_data
+        (de_sentence2idx, de_pos_lst, de_y) = dev_data
+
         # Write log
         logging.basicConfig(filename=os.path.join(result_dir, 'result.log'),
                             level=logging.DEBUG, format='%(asctime)s %(levelname)-8s %(message)s',
@@ -133,54 +136,55 @@ class CNN(object):
         max_val_f1 = 0
         for i in range(nb_epoch):
             # Training
-            train_history = self.model.fit(x=[sentence, pos_lst], y=y, epochs=1, batch_size=batch_size, verbose=1, validation_split=validation_split)
-            # Writing the log
+            train_history = self.model.fit(x=[tr_sentence2idx, tr_pos_lst], y=tr_y, epochs=1, batch_size=batch_size,
+                                           verbose=1)
+            # Metrics for Train data
+            pred_tr = self.model.predict(x=[tr_sentence2idx, tr_pos_lst], batch_size=batch_size, verbose=1)
             train_loss = train_history.history['loss'][0]
             train_acc = train_history.history['acc'][0]
-            train_f1 = train_history.history['f1'][0]
-            train_p = train_history.history['precision'][0]
-            train_r = train_history.history['recall'][0]
+            train_f1 = f1_score(np.argmax(tr_y, 1), np.argmax(pred_tr, 1), [1, 2, 3, 4], average='micro')
+            train_p = precision_score(np.argmax(tr_y, 1), np.argmax(pred_tr, 1), [1, 2, 3, 4], average='micro')
+            train_r = recall_score(np.argmax(tr_y, 1), np.argmax(pred_tr, 1), [1, 2, 3, 4], average='micro')
 
-            val_loss = train_history.history['val_loss'][0]
-            val_acc = train_history.history['val_acc'][0]
-            val_f1 = train_history.history['val_f1'][0]
-            val_p = train_history.history['val_precision'][0]
-            val_r = train_history.history['val_recall'][0]
+            # Metrics for Dev data
+            pred_de = self.model.predict(x=[de_sentence2idx, de_pos_lst], batch_size=batch_size, verbose=1)
+            val_f1 = f1_score(np.argmax(de_y, 1), np.argmax(pred_de, 1), [1, 2, 3, 4], average='micro')
+            val_p = precision_score(np.argmax(de_y, 1), np.argmax(pred_de, 1), [1, 2, 3, 4], average='micro')
+            val_r = recall_score(np.argmax(de_y, 1), np.argmax(pred_de, 1), [1, 2, 3, 4], average='micro')
+            # Writing the log
             logger.info('##train##, epoch: {:2d}, loss: {:.4f}, acc: {:.4f}, prec: {:.4f}, recall: {:.4f}, F1: {:.4f}'.format((i + 1),
                                                                                                                               train_loss,
                                                                                                                               train_acc,
                                                                                                                               train_p,
                                                                                                                               train_r,
                                                                                                                               train_f1))
-            logger.info('##dev##,   epoch: {:2d}, loss: {:.4f}, acc: {:.4f}, prec: {:.4f}, recall: {:.4f}, F1: {:.4f}'.format((i+1),
-                                                                                                                              val_loss,
-                                                                                                                              val_acc,
-                                                                                                                              val_p,
-                                                                                                                              val_r,
-                                                                                                                              val_f1))
+            logger.info('##dev##,   epoch: {:2d}, prec: {:.4f}, recall: {:.4f}, F1: {:.4f}'.format((i + 1),
+                                                                                                   val_p,
+                                                                                                   val_r,
+                                                                                                   val_f1))
             # Saving the weight if it is better than before (early-stopping)
             if max_val_f1 < val_f1:
                 max_val_f1 = val_f1
                 logging.info("[{}th epoch, Better performance! Update the weight!]".format(i + 1))
                 self.model.save_weights(os.path.join(result_dir, 'weights.h5'))
 
-    def evaluate(self, sentence, pos_lst, y, batch_size):
+    def evaluate(self, sentence2idx, pos_lst, y, batch_size):
         self.model.load_weights(os.path.join(result_dir, 'weights.h5'))
-        pred_test = self.model.evaluate(x=[sentence, pos_lst], y=y, batch_size=batch_size, verbose=1)
+        pred_te = self.model.predict(x=[sentence2idx, pos_lst], batch_size=batch_size, verbose=1)
+        te_f1 = f1_score(np.argmax(y, 1), np.argmax(pred_te, 1), [1, 2, 3, 4], average='micro')
+        te_p = precision_score(np.argmax(y, 1), np.argmax(pred_te, 1), [1, 2, 3, 4], average='micro')
+        te_r = recall_score(np.argmax(y, 1), np.argmax(pred_te, 1), [1, 2, 3, 4], average='micro')
         logger = logging.getLogger()
-        logger.info(
-            '##test##,  loss: {:.4f}, acc: {:.4f}, prec: {:.4f}, recall: {:.4f}, F1: {:.4f}'.format(pred_test[0],
-                                                                                                    pred_test[1],
-                                                                                                    pred_test[2],
-                                                                                                    pred_test[3],
-                                                                                                    pred_test[4],))
+        logger.info('##test##, prec: {:.4f}, recall: {:.4f}, F1: {:.4f}'.format(te_p,
+                                                                                te_r,
+                                                                                te_f1))
 
     def show_model_summary(self):
         print(self.model.summary(line_length=100))
 
-    def predict(self, sentence, pos_lst, batch_size, one_hot=True):
+    def predict(self, sentence2idx, pos_lst, batch_size, one_hot=True):
         self.model.load_weights(os.path.join(result_dir, 'weights.h5'))
-        y_pred = self.model.predict(x=[sentence, pos_lst], batch_size=batch_size)
+        y_pred = self.model.predict(x=[sentence2idx, pos_lst], batch_size=batch_size)
         print(y_pred.shape)
         print(y_pred[:5])
         if one_hot:
@@ -198,11 +202,12 @@ class CNN(object):
         print(one_hot[:5])
         return one_hot
 
-    def make_output_file(self, y_pred):
+    @staticmethod
+    def make_output_file(y_pred):
         pair_id_lst = load_test_pair_id()
         with open('output.tsv', 'w', encoding='utf-8') as f:
             assert len(y_pred) == len(pair_id_lst)
-            for pair_id, y in zip(pair_id_lst, y_pred): 
+            for pair_id, y in zip(pair_id_lst, y_pred):
                 line = "{}\t{}\t{}\n".format("DDI2013", pair_id, y)
                 f.write(line)
 
