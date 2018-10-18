@@ -1,6 +1,7 @@
 import keras
 from keras.preprocessing.sequence import pad_sequences
 from sklearn.model_selection import train_test_split
+from gensim.models import KeyedVectors
 
 from collections import Counter
 import numpy as np
@@ -182,28 +183,47 @@ def word2idx(sentences, vocb, unk_limit):
 
 
 def load_word_matrix(vocb, emb_dim, unk_limit):
-    embedding_index = dict()
-    file_name = 'glove.6B.{}d.txt'.format(emb_dim)
+    print("Loading word2vec...")
+    # load word2vec by gensim library
+    # Dimension is 200
+    file_name = 'PubMed-and-PMC-w2v.bin'
     vec_file_name = os.path.join(word2vec_dir, file_name)
     if not os.path.exists(vec_file_name):
         raise FileNotFoundError(vec_file_name + ' not found')
-    with open(vec_file_name, 'r', encoding='utf-8') as f:
-        for line in f:
-            line = line.rstrip()
-            values = line.split()
-            word = values[0]
-            coefs = np.asarray(values[1:], dtype='float32')
-            embedding_index[word] = coefs
-    word_matrix = np.zeros((unk_limit, emb_dim))
+    # with open(vec_file_name, 'r', encoding='utf-8') as f:
+    #     for line in f:
+    #         line = line.rstrip()
+    #         values = line.split()
+    #         word = values[0]
+    #         coefs = np.asarray(values[1:], dtype='float32')
+    #         embedding_index[word] = coefs
+    model = KeyedVectors.load_word2vec_format(vec_file_name, binary=True)
+    if len(vocb) < unk_limit:
+        word_matrix = np.zeros((len(vocb), emb_dim))
+    else:
+        word_matrix = np.zeros((unk_limit, emb_dim))
+    print('word_matrix.shape:', word_matrix.shape)
     cnt = 0
     for word, i in vocb.items():
         if i < unk_limit:
+            try:
+                if word == 'druga' or word == 'drugb' or word == 'drugn':
+                    vector = model['drug']
+                else:
+                    vector = model[word]
+                word_matrix[i] = np.asarray(vector)
+            except:
+                # word2vec에 없는 단어일 시
+                word_matrix[i] = np.random.uniform(-1.0, 1.0, emb_dim)
+                cnt += 1
+            '''
             embedding_vector = embedding_index.get(word)
             if embedding_vector is not None:
                 word_matrix[i] = embedding_vector
             else:
                 word_matrix[i] = np.random.uniform(-1.0, 1.0, emb_dim)
                 cnt += 1
+            '''
     print('{} words not in word vector'.format(cnt))
     return word_matrix
 

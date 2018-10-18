@@ -8,8 +8,8 @@ nb_epoch = 10
 batch_size = 200
 learning_rate = 0.001
 optimizer = 'adam'
-use_pretrained = False
-dev_split = 0.2
+use_pretrained = True  # If you're using pretrained, emb_dim will be 200 for PubMed-and-PMC-w2v.bin (http://evexdb.org/pmresources/vec-space-models/)
+dev_split = 0.1
 
 # 2. CNN specific
 kernel_lst = [3, 4, 5]
@@ -33,7 +33,7 @@ use_self_att = False
 
 if __name__ == '__main__':
     (tr_sentences2idx, tr_d1_pos_lst, tr_d2_pos_lst, tr_y), (te_sentences2idx, te_d1_pos_lst, te_d2_pos_lst, te_y), \
-    (vocb, vocb_inv), (d1_vocb, d2_vocb), (tr_sentences, tr_drug1_lst, tr_drug2_lst, tr_rel_lst), (
+        (vocb, vocb_inv), (d1_vocb, d2_vocb), (tr_sentences, tr_drug1_lst, tr_drug2_lst, tr_rel_lst), (
         te_sentences, te_drug1_lst, te_drug2_lst, te_rel_lst) = load_data(unk_limit=unk_limit, max_sent_len=max_sent_len)
 
     (tr_sentences2idx, tr_d1_pos_lst, tr_d2_pos_lst, tr_y), (de_sentences2idx, de_d1_pos_lst, de_d2_pos_lst, de_y) = train_dev_split(tr_sentences2idx,
