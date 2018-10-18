@@ -1,5 +1,5 @@
 import numpy as np
-from keras.layers import Dense, Conv1D, MaxPool1D, Flatten, Dropout, Embedding, Input, concatenate, add, Bidirectional, LSTM
+from keras.layers import Dense, Conv1D, MaxPool1D, Flatten, Dropout, Embedding, Input, concatenate, add, Bidirectional, LSTM, BatchNormalization
 from keras import Model
 from keras.optimizers import Adam, Adadelta, RMSprop, Adagrad
 from sklearn.metrics import f1_score, recall_score, precision_score
@@ -90,16 +90,24 @@ class CNN(object):
         for kernel_size in self.kernel_lst:
             conv_l = Conv1D(filters=self.nb_filters, kernel_size=kernel_size, padding='valid', activation='relu')(self.emb_concat)
             pool_l = MaxPool1D(pool_size=self.max_sent_len - kernel_size + 1)(conv_l)
-            drop_l = Dropout(self.dropout_rate)(pool_l)
+            # drop_l = Dropout(self.dropout_rate)(pool_l)
+            drop_l = Dropout(0.25)(pool_l)
+            # drop_l = BatchNormalization()(drop_l)
             # Append the final result
             layer_lst.append(drop_l)
 
         self.concat_l = concatenate(layer_lst)
 
     def add_fc_layer(self):
-        self.concat_drop_l = Dropout(self.dropout_rate)(self.concat_l)
-        self.flat_l = Flatten()(self.concat_drop_l)
-        self.pred_output = Dense(self.num_classes, activation='softmax')(self.flat_l)
+        # self.concat_drop_l = Dropout(self.dropout_rate)(self.concat_l)
+        # self.flat_l = Flatten()(self.concat_drop_l)
+        self.flat_l = Flatten()(self.concat_l)
+        self.fc_l_1 = Dense(128, activation='relu')(self.flat_l)
+        self.fc_l_1 = Dropout(self.dropout_rate)(self.fc_l_1)
+        self.pred_output = Dense(self.num_classes, activation='softmax')(self.fc_l_1)
+        # self.concat_drop_l = Dropout(self.dropout_rate)(self.concat_l)
+        # self.flat_l = Flatten()(self.concat_drop_l)
+        # self.pred_output = Dense(self.num_classes, activation='softmax')(self.flat_l)
 
     def compile_model(self):
         self.model = Model(inputs=[self.input_x, self.input_d1, self.input_d2], outputs=self.pred_output)

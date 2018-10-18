@@ -12,15 +12,15 @@ use_pretrained = True  # If you're using pretrained, emb_dim will be 200 for Pub
 dev_split = 0.1
 
 # 2. CNN specific
-kernel_lst = [3, 4, 5]
-nb_filters = 200
+kernel_lst = [3, 5, 7]
+nb_filters = 100
 
 # 3. RNN specific
 rnn_dim = 200  # Dimension for output of LSTM
 
 # 4. Model common settings
 emb_dim = 200
-pos_dim = 10
+pos_dim = 20
 max_sent_len = 150
 num_classes = 5
 unk_limit = 8000
