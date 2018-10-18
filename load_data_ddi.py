@@ -25,11 +25,12 @@ Column
 '''
 
 
-def load_sentence(filename):
+def load_sentence(filename, max_sent_len):
     sentences = []
     drug1_lst = []
     drug2_lst = []
-    entity_pos_lst = []
+    d1_pos_lst = []
+    d2_pos_lst = []
     rel_lst = []
 
     with open(os.path.join(data_dir, filename), 'r', encoding='utf-8') as f:
@@ -41,7 +42,9 @@ def load_sentence(filename):
             rel_lst.append(rel_class[item_lst[7]])
             sent = item_lst[8].split(' ')
             # Before Replacing, build positing list!!
-            entity_pos_lst.append(build_position_lst(sent))
+            d1, d2 = build_position_embedding(sent, max_sent_len)
+            d1_pos_lst.append(d1)
+            d2_pos_lst.append(d2)
             # Then replace drug name
             '''
             for idx, token in enumerate(sent):
@@ -53,14 +56,15 @@ def load_sentence(filename):
             sentences.append(sent)
             line_num += 1
 
-    assert len(sentences) == len(drug1_lst) == len(drug2_lst) == len(rel_lst) == len(entity_pos_lst)
+    assert len(sentences) == len(drug1_lst) == len(drug2_lst) == len(rel_lst) == len(d1_pos_lst) == len(d2_pos_lst)
     # Testing
     print('sentences[0]:', sentences[0])
     print('drug1_lst[0]:', drug1_lst[0])
     print('drug2_lst[0]:', drug2_lst[0])
     print('rel_lst[0]:', rel_lst[0])
-    print('entity_pos_lst[0]:', entity_pos_lst[0])
-    return sentences, drug1_lst, drug2_lst, rel_lst, entity_pos_lst
+    print('d1_pos_lst[0]:', d1_pos_lst[0])
+    print('d2_pos_lst[0]:', d2_pos_lst[0])
+    return sentences, drug1_lst, drug2_lst, rel_lst, d1_pos_lst, d2_pos_lst
 
 
 def load_test_pair_id():
@@ -71,51 +75,57 @@ def load_test_pair_id():
     return pair_id_lst
 
 
-def build_position_lst(sentence):
-    '''
-    0:None
-    1:Drug1
-    2:Drug2
-    '''
-    entity_in_sent = []
-    for token in sentence:
-        if token == 'druga':
-            entity_in_sent.append(1)
-        elif token == 'drugb':
-            entity_in_sent.append(2)
+def build_position_embedding(sent_list, max_sent_len):
+    # print(sent_list)
+    e1 = sent_list.index('druga')
+    e2 = sent_list.index('drugb')
+    # distance1 feature
+    d1 = []
+    for i in range(max_sent_len):
+        if i < e1:
+            d1.append(str(i - e1))
+        elif i > e1:
+            d1.append(str(i - e1))
         else:
-            entity_in_sent.append(0)
+            d1.append('0')
+    # distance2 feature
+    d2 = []
+    for i in range(max_sent_len):
+        if i < e2:
+            d2.append(str(i - e2))
+        elif i > e2:
+            d2.append(str(i - e2))
+        else:
+            d2.append('0')
+    return d1, d2
 
-    assert entity_in_sent.count(1) == 1 and entity_in_sent.count(2) == 1
 
-    return entity_in_sent
+def build_position_vocab(pos_lst):
+    # input: [tr_d1_pos_lst, te_d1_pos_lst]
+    # d1, d2 각각 따로 함수 호출해야 함
+    sent_list = sum(pos_lst, [])
+    wf = {}
+    for sent in sent_list:
+        for w in sent:
+            if w in wf:
+                wf[w] += 1
+            else:
+                wf[w] = 0
+
+    wl = []
+    for w, f in wf.items():
+        wl.append(w)
+    return wl
 
 
-# def find_drug1_drug2_in_sentence(sentences, drug1_lst, drug2_lst):
-#     '''
-#     0:None
-#     1:Drug1
-#     2:Drug2
-#     '''
-#     entity_pos_lst = []
-#     for idx, sentence in enumerate(sentences):
-#         entity_in_sent = []
-#         drug1 = drug1_lst[idx]
-#         drug2 = drug2_lst[idx]
-#         for word in sentence:
-#             if word == drug1:
-#                 entity_in_sent.append(1)
-#             elif word == drug2:
-#                 entity_in_sent.append(2)
-#             else:
-#                 entity_in_sent.append(0)
-#         # if entity_in_sent.count(1) != 1 or entity_in_sent.count(2) != 1:
-#         #     print(entity_in_sent)
-#         #     print(sentences[idx])
-#         entity_pos_lst.append(entity_in_sent)
-#     print('entity_pos_lst[0]:', entity_pos_lst[0])
-
-#     return entity_pos_lst
+def map_word_to_id(sent_contents, word_list):
+    T = []
+    for sent in sent_contents:
+        t = []
+        for w in sent:
+            t.append(word_list.index(w))
+        T.append(t)
+    return T
 
 
 def build_word_vocab(sentences):
@@ -206,32 +216,51 @@ def one_hot_encoding(rel_lst):
     return keras.utils.to_categorical(rel_lst, num_classes=len(rel_class))
 
 
-def train_dev_split(sentence, pos_lst, y, dev_size=0.1, shuffle=True):
+def train_dev_split(sentence, d1_pos_lst, d2_pos_lst, y, dev_size=0.1, shuffle=True):
     zip_x = []
-    for s, p in zip(sentence, pos_lst):
-        zip_x.append((s, p))
+    for s, d1, d2 in zip(sentence, d1_pos_lst, d2_pos_lst):
+        zip_x.append((s, d1, d2))
 
     X_train, X_dev, tr_y, de_y = train_test_split(zip_x, y, test_size=dev_size, shuffle=shuffle)
     tr_sentence = []
-    tr_pos_lst = []
+    tr_d1_pos_lst = []
+    tr_d2_pos_lst = []
     de_sentence = []
-    de_pos_lst = []
+    de_d1_pos_lst = []
+    de_d2_pos_lst = []
     for item in X_train:
         tr_sentence.append(item[0])
-        tr_pos_lst.append(item[1])
+        tr_d1_pos_lst.append(item[1])
+        tr_d2_pos_lst.append(item[2])
     for item in X_dev:
         de_sentence.append(item[0])
-        de_pos_lst.append(item[1])
+        de_d1_pos_lst.append(item[1])
+        de_d2_pos_lst.append(item[2])
 
-    assert len(tr_sentence) == len(tr_pos_lst) == len(tr_y)
-    assert len(de_sentence) == len(de_pos_lst) == len(de_y)
+    assert len(tr_sentence) == len(tr_d1_pos_lst) == len(tr_d2_pos_lst) == len(tr_y)
+    assert len(de_sentence) == len(de_d1_pos_lst) == len(de_d2_pos_lst) == len(de_y)
 
-    return (tr_sentence, tr_pos_lst, tr_y), (de_sentence, de_pos_lst, de_y)
+    return (tr_sentence, tr_d1_pos_lst, tr_d2_pos_lst, tr_y), (de_sentence, de_d1_pos_lst, de_d1_pos_lst, de_y)
 
 
 def load_data(unk_limit, max_sent_len):
-    tr_sentences, tr_drug1_lst, tr_drug2_lst, tr_rel_lst, tr_pos_lst = load_sentence(train_filename)
-    te_sentences, te_drug1_lst, te_drug2_lst, te_rel_lst, te_pos_lst = load_sentence(test_filename)
+    tr_sentences, tr_drug1_lst, tr_drug2_lst, tr_rel_lst, tr_d1_pos_lst, tr_d2_pos_lst = load_sentence(train_filename, max_sent_len)
+    te_sentences, te_drug1_lst, te_drug2_lst, te_rel_lst, te_d1_pos_lst, te_d2_pos_lst = load_sentence(test_filename, max_sent_len)
+
+    # Build distance position vocb
+    d1_vocb = build_position_vocab([tr_d1_pos_lst, te_d1_pos_lst])
+    d2_vocb = build_position_vocab([tr_d2_pos_lst, te_d2_pos_lst])
+
+    # position to idx
+    tr_d1_pos_lst = map_word_to_id(tr_d1_pos_lst, d1_vocb)
+    tr_d2_pos_lst = map_word_to_id(tr_d2_pos_lst, d2_vocb)
+    te_d1_pos_lst = map_word_to_id(te_d1_pos_lst, d1_vocb)
+    te_d2_pos_lst = map_word_to_id(te_d2_pos_lst, d2_vocb)
+
+    print("tr_d1_pos_lst[0]:", tr_d1_pos_lst[0])
+    print("tr_d2_pos_lst[0]:", tr_d2_pos_lst[0])
+    print("te_d1_pos_lst[0]:", te_d1_pos_lst[0])
+    print("te_d2_pos_lst[0]:", te_d2_pos_lst[0])
 
     # Build vocab only with train data
     vocb, vocb_inv = build_word_vocab(tr_sentences)
@@ -244,18 +273,19 @@ def load_data(unk_limit, max_sent_len):
     tr_sentences2idx = pad_sequence(tr_sentences2idx, max_sent_len=max_sent_len)
     te_sentences2idx = pad_sequence(te_sentences2idx, max_sent_len=max_sent_len)
 
-    tr_pos_lst = pad_sequence(tr_pos_lst, max_sent_len=max_sent_len)
-    te_pos_lst = pad_sequence(te_pos_lst, max_sent_len=max_sent_len)
+    # numpy to list
+    tr_sentences2idx = tr_sentences2idx.tolist()
+    te_sentences2idx = te_sentences2idx.tolist()
 
     # tr_y, te_y
     tr_y = one_hot_encoding(tr_rel_lst)
     te_y = one_hot_encoding(te_rel_lst)
     print('tr_y[0]:', tr_y[0])
     print('te_y[0]:', te_y[0])
-    return (tr_sentences2idx, tr_pos_lst, tr_y), (te_sentences2idx, te_pos_lst, te_y), \
-           (vocb, vocb_inv), (tr_sentences, tr_drug1_lst, tr_drug2_lst, tr_rel_lst), (
+    return (tr_sentences2idx, tr_d1_pos_lst, tr_d2_pos_lst, tr_y), (te_sentences2idx, te_d1_pos_lst, te_d2_pos_lst, te_y), \
+           (vocb, vocb_inv), (d1_vocb, d2_vocb), (tr_sentences, tr_drug1_lst, tr_drug2_lst, tr_rel_lst), (
                te_sentences, te_drug1_lst, te_drug2_lst, te_rel_lst)
 
 
 if __name__ == '__main__':
-    load_data(unk_limit=5000, max_sent_len=50)
+    load_data(unk_limit=8000, max_sent_len=50)

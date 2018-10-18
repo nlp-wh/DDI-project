@@ -21,6 +21,8 @@ class CNN(object):
     def __init__(self,
                  max_sent_len,
                  vocb,
+                 d1_vocb,
+                 d2_vocb,
                  num_classes,
                  emb_dim=100,
                  pos_dim=10,
@@ -34,6 +36,8 @@ class CNN(object):
                  unk_limit=10000):
         self.max_sent_len = max_sent_len
         self.vocb = vocb
+        self.d1_vocb = d1_vocb
+        self.d2_vocb = d2_vocb
         self.emb_dim = emb_dim
         self.pos_dim = pos_dim
         self.kernel_lst = kernel_lst
@@ -56,7 +60,8 @@ class CNN(object):
 
     def add_input_layer(self):
         self.input_x = Input(shape=(self.max_sent_len,), dtype='int32')
-        self.input_pos = Input(shape=(self.max_sent_len,), dtype='int32')
+        self.input_d1 = Input(shape=(self.max_sent_len,), dtype='int32')
+        self.input_d2 = Input(shape=(self.max_sent_len,), dtype='int32')
 
     def add_embedding_layer(self):
         # If static, trainable = False. If non-static, trainable = True
@@ -71,11 +76,13 @@ class CNN(object):
             self.w_emb = Embedding(input_dim=len(self.vocb), output_dim=self.emb_dim,
                                    input_length=self.max_sent_len, trainable=self.non_static)(self.input_x)
 
-        # Position Embedding (0, 1, 2)
-        self.pos_emb = Embedding(input_dim=3, output_dim=self.pos_dim, input_length=self.max_sent_len, trainable=True)(self.input_pos)
-
+        # Position Embedding
+        # d1
+        self.d1_emb = Embedding(input_dim=len(self.d1_vocb), output_dim=self.pos_dim, input_length=self.max_sent_len, trainable=True)(self.input_d1)
+        # d2
+        self.d2_emb = Embedding(input_dim=len(self.d2_vocb), output_dim=self.pos_dim, input_length=self.max_sent_len, trainable=True)(self.input_d2)
         # Concatenation
-        self.emb_concat = concatenate([self.w_emb, self.pos_emb])
+        self.emb_concat = concatenate([self.w_emb, self.d1_emb, self.d2_emb])
 
     def add_cnn_layer(self):
         # CNN Parts
@@ -95,7 +102,7 @@ class CNN(object):
         self.pred_output = Dense(self.num_classes, activation='softmax')(self.flat_l)
 
     def compile_model(self):
-        self.model = Model(inputs=[self.input_x, self.input_pos], outputs=self.pred_output)
+        self.model = Model(inputs=[self.input_x, self.input_d1, self.input_d2], outputs=self.pred_output)
         # Optimizer
         if self.optimizer.lower() == 'adam':
             opt = Adam(lr=self.lr_rate)
@@ -121,8 +128,8 @@ class CNN(object):
 
     def train(self, nb_epoch, batch_size, train_data, dev_data):
         # Unpack data
-        (tr_sentence2idx, tr_pos_lst, tr_y) = train_data
-        (de_sentence2idx, de_pos_lst, de_y) = dev_data
+        (tr_sentences2idx, tr_d1_pos_lst, tr_d2_pos_lst, tr_y) = train_data
+        (de_sentences2idx, de_d1_pos_lst, de_d2_pos_lst, de_y) = dev_data
 
         # Write log
         logging.basicConfig(filename=os.path.join(result_dir, 'result.log'),
@@ -136,10 +143,10 @@ class CNN(object):
         max_val_f1 = 0
         for i in range(nb_epoch):
             # Training
-            train_history = self.model.fit(x=[tr_sentence2idx, tr_pos_lst], y=tr_y, epochs=1, batch_size=batch_size,
+            train_history = self.model.fit(x=[tr_sentences2idx, tr_d1_pos_lst, tr_d2_pos_lst], y=tr_y, epochs=1, batch_size=batch_size,
                                            verbose=1)
             # Metrics for Train data
-            pred_tr = self.model.predict(x=[tr_sentence2idx, tr_pos_lst], batch_size=batch_size, verbose=1)
+            pred_tr = self.model.predict(x=[tr_sentences2idx, tr_d1_pos_lst, tr_d2_pos_lst], batch_size=batch_size, verbose=1)
             train_loss = train_history.history['loss'][0]
             train_acc = train_history.history['acc'][0]
             train_f1 = f1_score(np.argmax(tr_y, 1), np.argmax(pred_tr, 1), [1, 2, 3, 4], average='micro')
@@ -147,7 +154,7 @@ class CNN(object):
             train_r = recall_score(np.argmax(tr_y, 1), np.argmax(pred_tr, 1), [1, 2, 3, 4], average='micro')
 
             # Metrics for Dev data
-            pred_de = self.model.predict(x=[de_sentence2idx, de_pos_lst], batch_size=batch_size, verbose=1)
+            pred_de = self.model.predict(x=[de_sentences2idx, de_d1_pos_lst, de_d2_pos_lst], batch_size=batch_size, verbose=1)
             val_f1 = f1_score(np.argmax(de_y, 1), np.argmax(pred_de, 1), [1, 2, 3, 4], average='micro')
             val_p = precision_score(np.argmax(de_y, 1), np.argmax(pred_de, 1), [1, 2, 3, 4], average='micro')
             val_r = recall_score(np.argmax(de_y, 1), np.argmax(pred_de, 1), [1, 2, 3, 4], average='micro')
@@ -168,9 +175,9 @@ class CNN(object):
                 logging.info("[{}th epoch, Better performance! Update the weight!]".format(i + 1))
                 self.model.save_weights(os.path.join(result_dir, 'weights.h5'))
 
-    def evaluate(self, sentence2idx, pos_lst, y, batch_size):
+    def evaluate(self, sentences2idx, d1_lst, d2_lst, y, batch_size):
         self.model.load_weights(os.path.join(result_dir, 'weights.h5'))
-        pred_te = self.model.predict(x=[sentence2idx, pos_lst], batch_size=batch_size, verbose=1)
+        pred_te = self.model.predict(x=[sentences2idx, d1_lst, d2_lst], batch_size=batch_size, verbose=1)
         te_f1 = f1_score(np.argmax(y, 1), np.argmax(pred_te, 1), [1, 2, 3, 4], average='micro')
         te_p = precision_score(np.argmax(y, 1), np.argmax(pred_te, 1), [1, 2, 3, 4], average='micro')
         te_r = recall_score(np.argmax(y, 1), np.argmax(pred_te, 1), [1, 2, 3, 4], average='micro')
@@ -182,9 +189,9 @@ class CNN(object):
     def show_model_summary(self):
         print(self.model.summary(line_length=100))
 
-    def predict(self, sentence2idx, pos_lst, batch_size, one_hot=True):
+    def predict(self, sentences2idx, d1_lst, d2_lst, batch_size, one_hot=True):
         self.model.load_weights(os.path.join(result_dir, 'weights.h5'))
-        y_pred = self.model.predict(x=[sentence2idx, pos_lst], batch_size=batch_size)
+        y_pred = self.model.predict(x=[sentences2idx, d1_lst, d2_lst], batch_size=batch_size)
         print(y_pred.shape)
         print(y_pred[:5])
         if one_hot:
@@ -216,6 +223,8 @@ class MCCNN(CNN):
     def __init__(self,
                  max_sent_len,
                  vocb,
+                 d1_vocb,
+                 d2_vocb,
                  num_classes,
                  emb_dim=100,
                  pos_dim=10,
@@ -228,6 +237,8 @@ class MCCNN(CNN):
                  unk_limit=10000):
         self.max_sent_len = max_sent_len
         self.vocb = vocb
+        self.d1_vocb = d1_vocb
+        self.d2_vocb = d2_vocb
         self.num_classes = num_classes
         self.emb_dim = emb_dim
         self.pos_dim = pos_dim
@@ -257,11 +268,13 @@ class MCCNN(CNN):
             self.w_emb_non_static = Embedding(input_dim=len(self.vocb), output_dim=self.emb_dim,
                                               input_length=self.max_sent_len, trainable=True)(self.input_x)
         # Position Embedding (0, 1, 2)
-        self.pos_emb = Embedding(input_dim=3, output_dim=self.pos_dim, input_length=self.max_sent_len, trainable=True)(self.input_pos)
-
+        # d1
+        self.d1_emb = Embedding(input_dim=len(self.d1_vocb), output_dim=self.pos_dim, input_length=self.max_sent_len, trainable=True)(self.input_d1)
+        # d2
+        self.d2_emb = Embedding(input_dim=len(self.d2_vocb), output_dim=self.pos_dim, input_length=self.max_sent_len, trainable=True)(self.input_d2)
         # Concatenation
-        self.w_emb_static_concat = concatenate([self.w_emb_static, self.pos_emb])
-        self.w_emb_non_static_concat = concatenate([self.w_emb_non_static, self.pos_emb])
+        self.w_emb_static_concat = concatenate([self.w_emb_static, self.d1_emb, self.d2_emb])
+        self.w_emb_non_static_concat = concatenate([self.w_emb_non_static, self.d1_emb, self.d2_emb])
 
     def add_cnn_layer(self):
         # CNN Parts
@@ -289,6 +302,8 @@ class BILSTM(CNN):
     def __init__(self,
                  max_sent_len,
                  vocb,
+                 d1_vocb,
+                 d2_vocb,
                  num_classes,
                  emb_dim=100,
                  pos_dim=10,
@@ -302,6 +317,8 @@ class BILSTM(CNN):
                  use_self_att=False):
         self.max_sent_len = max_sent_len
         self.vocb = vocb
+        self.d1_vocb = d1_vocb
+        self.d2_vocb = d2_vocb
         self.num_classes = num_classes
         self.emb_dim = emb_dim
         self.pos_dim = pos_dim

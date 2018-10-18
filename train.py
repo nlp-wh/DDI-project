@@ -9,7 +9,7 @@ batch_size = 200
 learning_rate = 0.001
 optimizer = 'adam'
 use_pretrained = False
-dev_split = 0.1
+dev_split = 0.2
 
 # 2. CNN specific
 kernel_lst = [3, 4, 5]
@@ -32,17 +32,21 @@ use_self_att = False
 
 
 if __name__ == '__main__':
-    (tr_sentence2idx, tr_pos_lst, tr_y), (te_sentences2idx, te_pos_lst, te_y), \
-    (vocb, vocb_inv), (tr_sentences, tr_drug1_lst, tr_drug2_lst, tr_rel_lst), \
-    (te_sentences, te_drug1_lst, te_drug2_lst, te_rel_lst) = load_data(unk_limit=unk_limit, max_sent_len=max_sent_len)
+    (tr_sentences2idx, tr_d1_pos_lst, tr_d2_pos_lst, tr_y), (te_sentences2idx, te_d1_pos_lst, te_d2_pos_lst, te_y), \
+    (vocb, vocb_inv), (d1_vocb, d2_vocb), (tr_sentences, tr_drug1_lst, tr_drug2_lst, tr_rel_lst), (
+        te_sentences, te_drug1_lst, te_drug2_lst, te_rel_lst) = load_data(unk_limit=unk_limit, max_sent_len=max_sent_len)
 
-    (tr_sentence2idx, tr_pos_lst, tr_y), (de_sentence2idx, de_pos_lst, de_y) = train_dev_split(tr_sentence2idx,
-                                                                                               tr_pos_lst, tr_y,
-                                                                                               dev_size=dev_split,
-                                                                                               shuffle=True)
+    (tr_sentences2idx, tr_d1_pos_lst, tr_d2_pos_lst, tr_y), (de_sentences2idx, de_d1_pos_lst, de_d2_pos_lst, de_y) = train_dev_split(tr_sentences2idx,
+                                                                                                                                     tr_d1_pos_lst,
+                                                                                                                                     tr_d2_pos_lst,
+                                                                                                                                     tr_y,
+                                                                                                                                     dev_size=dev_split,
+                                                                                                                                     shuffle=True)
     if train_mode.lower() == 'cnn':
         model = CNN(max_sent_len=max_sent_len,
                     vocb=vocb,
+                    d1_vocb=d1_vocb,
+                    d2_vocb=d2_vocb,
                     emb_dim=emb_dim,
                     pos_dim=pos_dim,
                     kernel_lst=kernel_lst,
@@ -58,6 +62,8 @@ if __name__ == '__main__':
     elif train_mode.lower() == 'mccnn':
         model = MCCNN(max_sent_len=max_sent_len,
                       vocb=vocb,
+                      d1_vocb=d1_vocb,
+                      d2_vocb=d2_vocb,
                       emb_dim=emb_dim,
                       pos_dim=pos_dim,
                       kernel_lst=kernel_lst,
@@ -72,6 +78,8 @@ if __name__ == '__main__':
     elif train_mode.lower() == 'rnn':
         model = BILSTM(max_sent_len=max_sent_len,
                        vocb=vocb,
+                       d1_vocb=d1_vocb,
+                       d2_vocb=d2_vocb,
                        emb_dim=emb_dim,
                        pos_dim=pos_dim,
                        rnn_dim=rnn_dim,
@@ -88,6 +96,6 @@ if __name__ == '__main__':
         raise Exception("Wrong Training Model")
     model.show_model_summary()
     model.save_model()
-    model.train(nb_epoch=nb_epoch, batch_size=batch_size, train_data=(tr_sentence2idx, tr_pos_lst, tr_y),
-                dev_data=(de_sentence2idx, de_pos_lst, de_y))
-    model.evaluate(sentence2idx=te_sentences2idx, pos_lst=te_pos_lst, y=te_y, batch_size=batch_size)
+    model.train(nb_epoch=nb_epoch, batch_size=batch_size, train_data=(tr_sentences2idx, tr_d1_pos_lst, tr_d2_pos_lst, tr_y),
+                dev_data=(de_sentences2idx, de_d1_pos_lst, de_d2_pos_lst, de_y))
+    model.evaluate(sentences2idx=te_sentences2idx, d1_lst=te_d1_pos_lst, d2_lst=te_d2_pos_lst, y=te_y, batch_size=batch_size)
