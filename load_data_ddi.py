@@ -33,6 +33,7 @@ def load_sentence(filename, max_sent_len):
     d1_pos_lst = []
     d2_pos_lst = []
     rel_lst = []
+    pos_tuple_lst = []
 
     with open(os.path.join(data_dir, filename), 'r', encoding='utf-8') as f:
         line_num = 0
@@ -43,9 +44,10 @@ def load_sentence(filename, max_sent_len):
             rel_lst.append(rel_class[item_lst[7]])
             sent = item_lst[8].split(' ')
             # Before Replacing, build positing list!!
-            d1, d2 = build_position_embedding(sent, max_sent_len)
+            d1, d2, e_pos_tup = build_position_embedding(sent, max_sent_len)
             d1_pos_lst.append(d1)
             d2_pos_lst.append(d2)
+            pos_tuple_lst.append(e_pos_tup)
             # Then replace drug name
             '''
             for idx, token in enumerate(sent):
@@ -57,7 +59,7 @@ def load_sentence(filename, max_sent_len):
             sentences.append(sent)
             line_num += 1
 
-    assert len(sentences) == len(drug1_lst) == len(drug2_lst) == len(rel_lst) == len(d1_pos_lst) == len(d2_pos_lst)
+    assert len(sentences) == len(drug1_lst) == len(drug2_lst) == len(rel_lst) == len(d1_pos_lst) == len(d2_pos_lst) == len(pos_tuple_lst)
     # Testing
     print('sentences[0]:', sentences[0])
     print('drug1_lst[0]:', drug1_lst[0])
@@ -65,7 +67,8 @@ def load_sentence(filename, max_sent_len):
     print('rel_lst[0]:', rel_lst[0])
     print('d1_pos_lst[0]:', d1_pos_lst[0])
     print('d2_pos_lst[0]:', d2_pos_lst[0])
-    return sentences, drug1_lst, drug2_lst, rel_lst, d1_pos_lst, d2_pos_lst
+    print('pos_tuple_lst[0]:', pos_tuple_lst[0])
+    return sentences, drug1_lst, drug2_lst, rel_lst, d1_pos_lst, d2_pos_lst, pos_tuple_lst
 
 
 def load_test_pair_id():
@@ -98,7 +101,7 @@ def build_position_embedding(sent_list, max_sent_len):
             d2.append(str(i - e2))
         else:
             d2.append('0')
-    return d1, d2
+    return d1, d2, [e1, e2]
 
 
 def build_position_vocab(pos_lst):
@@ -236,36 +239,40 @@ def one_hot_encoding(rel_lst):
     return keras.utils.to_categorical(rel_lst, num_classes=len(rel_class))
 
 
-def train_dev_split(sentence, d1_pos_lst, d2_pos_lst, y, dev_size=0.1, shuffle=True):
+def train_dev_split(sentence, d1_pos_lst, d2_pos_lst, pos_tuple_lst, y, dev_size=0.1, shuffle=True):
     zip_x = []
-    for s, d1, d2 in zip(sentence, d1_pos_lst, d2_pos_lst):
-        zip_x.append((s, d1, d2))
+    for s, d1, d2, pos_tuple in zip(sentence, d1_pos_lst, d2_pos_lst, pos_tuple_lst):
+        zip_x.append((s, d1, d2, pos_tuple))
 
     X_train, X_dev, tr_y, de_y = train_test_split(zip_x, y, test_size=dev_size, shuffle=shuffle)
     tr_sentence = []
     tr_d1_pos_lst = []
     tr_d2_pos_lst = []
+    tr_pos_tuple_lst = []
     de_sentence = []
     de_d1_pos_lst = []
     de_d2_pos_lst = []
+    de_pos_tuple_lst = []
     for item in X_train:
         tr_sentence.append(item[0])
         tr_d1_pos_lst.append(item[1])
         tr_d2_pos_lst.append(item[2])
+        tr_pos_tuple_lst.append(item[3])
     for item in X_dev:
         de_sentence.append(item[0])
         de_d1_pos_lst.append(item[1])
         de_d2_pos_lst.append(item[2])
+        de_pos_tuple_lst.append(item[3])
 
-    assert len(tr_sentence) == len(tr_d1_pos_lst) == len(tr_d2_pos_lst) == len(tr_y)
-    assert len(de_sentence) == len(de_d1_pos_lst) == len(de_d2_pos_lst) == len(de_y)
+    assert len(tr_sentence) == len(tr_d1_pos_lst) == len(tr_d2_pos_lst) == len(tr_pos_tuple_lst) == len(tr_y)
+    assert len(de_sentence) == len(de_d1_pos_lst) == len(de_d2_pos_lst) == len(de_pos_tuple_lst) == len(de_y)
 
-    return (tr_sentence, tr_d1_pos_lst, tr_d2_pos_lst, tr_y), (de_sentence, de_d1_pos_lst, de_d1_pos_lst, de_y)
+    return (tr_sentence, tr_d1_pos_lst, tr_d2_pos_lst, tr_pos_tuple_lst, tr_y), (de_sentence, de_d1_pos_lst, de_d1_pos_lst, de_pos_tuple_lst, de_y)
 
 
-def load_data(unk_limit, max_sent_len):
-    tr_sentences, tr_drug1_lst, tr_drug2_lst, tr_rel_lst, tr_d1_pos_lst, tr_d2_pos_lst = load_sentence(train_filename, max_sent_len)
-    te_sentences, te_drug1_lst, te_drug2_lst, te_rel_lst, te_d1_pos_lst, te_d2_pos_lst = load_sentence(test_filename, max_sent_len)
+def load_data(unk_limit, max_sent_len, dev_size):
+    tr_sentences, tr_drug1_lst, tr_drug2_lst, tr_rel_lst, tr_d1_pos_lst, tr_d2_pos_lst, tr_pos_tuple_lst = load_sentence(train_filename, max_sent_len)
+    te_sentences, te_drug1_lst, te_drug2_lst, te_rel_lst, te_d1_pos_lst, te_d2_pos_lst, te_pos_tuple_lst = load_sentence(test_filename, max_sent_len)
 
     # Build distance position vocb
     d1_vocb = build_position_vocab([tr_d1_pos_lst, te_d1_pos_lst])
@@ -302,9 +309,22 @@ def load_data(unk_limit, max_sent_len):
     te_y = one_hot_encoding(te_rel_lst)
     print('tr_y[0]:', tr_y[0])
     print('te_y[0]:', te_y[0])
-    return (tr_sentences2idx, tr_d1_pos_lst, tr_d2_pos_lst, tr_y), (te_sentences2idx, te_d1_pos_lst, te_d2_pos_lst, te_y), \
-           (vocb, vocb_inv), (d1_vocb, d2_vocb), (tr_sentences, tr_drug1_lst, tr_drug2_lst, tr_rel_lst), (
-               te_sentences, te_drug1_lst, te_drug2_lst, te_rel_lst)
+
+    # Train, Dev split
+    # Add position tuple for PiecewiseCNN
+    (tr_sentences2idx, tr_d1_pos_lst, tr_d2_pos_lst, tr_pos_tuple_lst, tr_y), (
+        de_sentences2idx, de_d1_pos_lst, de_d2_pos_lst, de_pos_tuple_lst, de_y) = train_dev_split(tr_sentences2idx,
+                                                                                                  tr_d1_pos_lst,
+                                                                                                  tr_d2_pos_lst,
+                                                                                                  tr_pos_tuple_lst,
+                                                                                                  tr_y,
+                                                                                                  dev_size=dev_size,
+                                                                                                  shuffle=True)
+
+    return (tr_sentences2idx, tr_d1_pos_lst, tr_d2_pos_lst, tr_pos_tuple_lst, tr_y), \
+           (de_sentences2idx, de_d1_pos_lst, de_d2_pos_lst, de_pos_tuple_lst, de_y), \
+           (te_sentences2idx, te_d1_pos_lst, te_d2_pos_lst, te_pos_tuple_lst, te_y), \
+           (vocb, vocb_inv), (d1_vocb, d2_vocb)
 
 
 if __name__ == '__main__':
