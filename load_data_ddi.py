@@ -119,6 +119,8 @@ def build_position_vocab(pos_lst):
     wl = []
     for w, f in wf.items():
         wl.append(w)
+    # Append <PAD>
+    wl.insert(0, '<PAD>')
     return wl
 
 
@@ -327,5 +329,47 @@ def load_data(unk_limit, max_sent_len, dev_size):
            (vocb, vocb_inv), (d1_vocb, d2_vocb)
 
 
+def to_piece(sequence, pos_tuple_lst):
+    left = []
+    mid = []
+    right = []
+    assert len(sequence) == len(pos_tuple_lst)
+    for i in range(len(sequence)):
+        left_idx = pos_tuple_lst[i][0]
+        right_idx = pos_tuple_lst[i][1]
+        left.append(sequence[0:left_idx+1])
+        mid.append(sequence[left_idx+1:right_idx+1])
+        right.append(sequence[right_idx+1:])
+    return left, mid, right
+
+
+def sentence_split_for_pcnn(sentences2idx, d1_pos_lst, d2_pos_lst, pos_tuple_lst, max_sent_len):
+    '''
+    Return: 
+        (sent_left, d1_left, d2_left), 
+        (sent_mid, d1_mid, d2_mid), 
+        (sent_right, d1_right, d2_right)
+    '''
+    # Split into 3 parts
+    sent_left, sent_mid, sent_right = to_piece(sentences2idx, pos_tuple_lst)
+    d1_left, d1_mid, d1_right = to_piece(d1_pos_lst, pos_tuple_lst)
+    d2_left, d2_mid, d2_right = to_piece(d2_pos_lst, pos_tuple_lst)
+
+    # Pad sequencing
+    sent_left = pad_sequence(sent_left, max_sent_len)
+    sent_mid = pad_sequence(sent_mid, max_sent_len)
+    sent_right = pad_sequence(sent_right, max_sent_len)
+
+    d1_left = pad_sequence(d1_left, max_sent_len)
+    d1_mid = pad_sequence(d1_mid, max_sent_len)
+    d1_right = pad_sequence(d1_right, max_sent_len)
+
+    d2_left = pad_sequence(d2_left, max_sent_len)
+    d2_mid = pad_sequence(d2_mid, max_sent_len)
+    d2_right = pad_sequence(d2_right, max_sent_len)
+
+    return (sent_left, d1_left, d2_left), (sent_mid, d1_mid, d2_mid), (sent_right, d1_right, d2_right)
+
+
 if __name__ == '__main__':
-    load_data(unk_limit=8000, max_sent_len=50)
+    load_data(unk_limit=8000, max_sent_len=50, dev_size=0.1)
