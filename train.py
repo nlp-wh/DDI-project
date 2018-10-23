@@ -4,7 +4,7 @@ from model import CNN, MCCNN, BILSTM, PCNN
 ########### Hyperparameter ###########
 # 1. Training settings
 train_mode = 'pcnn'
-nb_epoch = 15
+nb_epoch = 30
 batch_size = 200
 learning_rate = 0.0005
 optimizer = 'adam'
@@ -20,7 +20,7 @@ rnn_dim = 200  # Dimension for output of LSTM
 
 # 4. Model common settings
 emb_dim = 200
-pos_dim = 20
+pos_dim = 10
 max_sent_len = 150
 num_classes = 5
 unk_limit = 8000

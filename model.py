@@ -1,6 +1,6 @@
 import numpy as np
 from keras.layers import Dense, Conv1D, MaxPool1D, Flatten, Dropout, Embedding, Input, concatenate, add, Bidirectional, LSTM, BatchNormalization, \
-    GlobalMaxPool1D
+    GlobalMaxPool1D, Activation
 from keras import Model
 from keras.optimizers import Adam, Adadelta, RMSprop, Adagrad
 from sklearn.metrics import f1_score, recall_score, precision_score
@@ -491,9 +491,19 @@ class PCNN(CNN):
         layer_lst = []
         for kernel_size in self.kernel_lst:
             # left, mid, right convolution
-            conv_l_left = Conv1D(filters=self.nb_filters, kernel_size=kernel_size, padding='same', activation='relu')(self.emb_concat_left)
-            conv_l_mid = Conv1D(filters=self.nb_filters, kernel_size=kernel_size, padding='same', activation='relu')(self.emb_concat_mid)
-            conv_l_right = Conv1D(filters=self.nb_filters, kernel_size=kernel_size, padding='same', activation='relu')(self.emb_concat_right)
+            conv_l_left = Conv1D(filters=self.nb_filters, kernel_size=kernel_size, padding='same')(self.emb_concat_left)
+            conv_l_mid = Conv1D(filters=self.nb_filters, kernel_size=kernel_size, padding='same')(self.emb_concat_mid)
+            conv_l_right = Conv1D(filters=self.nb_filters, kernel_size=kernel_size, padding='same')(self.emb_concat_right)
+
+            # Batch normalization
+            # conv_l_left = BatchNormalization()(conv_l_left)
+            # conv_l_mid = BatchNormalization()(conv_l_mid)
+            # conv_l_right = BatchNormalization()(conv_l_right)
+
+            # Activation
+            conv_l_left = Activation('relu')(conv_l_left)
+            conv_l_mid = Activation('relu')(conv_l_mid)
+            conv_l_right = Activation('relu')(conv_l_right)
 
             # Maxpool
             pool_l_left = GlobalMaxPool1D()(conv_l_left)
@@ -515,7 +525,11 @@ class PCNN(CNN):
         self.fc_l_1 = Dropout(self.dropout_rate)(self.fc_l_1)
         self.fc_l_2 = Dense(300, activation='relu')(self.fc_l_1)
         self.fc_l_2 = Dropout(self.dropout_rate)(self.fc_l_2)
-        self.pred_output = Dense(self.num_classes, activation='softmax')(self.fc_l_2)
+        self.fc_l_3 = Dense(128, activation='relu')(self.fc_l_2)
+        self.fc_l_3 = Dropout(self.dropout_rate)(self.fc_l_3)
+        self.pred_output = Dense(self.num_classes)(self.fc_l_3)
+        # self.pred_output = BatchNormalization()(self.pred_output)
+        self.pred_output = Activation('softmax')(self.pred_output)
         # self.pred_output = Dense(self.num_classes, activation='softmax')(self.concat_l)
 
     def compile_model(self):
