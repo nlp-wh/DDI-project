@@ -337,9 +337,14 @@ def to_piece(sequence, pos_tuple_lst):
     for i in range(len(sequence)):
         left_idx = pos_tuple_lst[i][0]
         right_idx = pos_tuple_lst[i][1]
-        left.append(sequence[0:left_idx+1])
-        mid.append(sequence[left_idx+1:right_idx+1])
-        right.append(sequence[right_idx+1:])
+        left.append(sequence[i][0:left_idx+1])
+        mid.append(sequence[i][left_idx+1:right_idx+1])
+        right.append(sequence[i][right_idx+1:])
+    # Testing
+    # print("left[0]:", left[0])
+    # print("mid[0]:", mid[0])
+    # print("right[0]:", right[0])
+
     return left, mid, right
 
 

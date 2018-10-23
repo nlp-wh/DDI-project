@@ -90,13 +90,13 @@ class PCNN(object):
         else:
             # If static, trainable = False. If non-static, trainable = True
             self.w_emb_left = Embedding(input_dim=len(self.vocb), output_dim=self.emb_dim,
-                                        input_length=self.max_sent_len, trainable=self.non_static)(self.input_x_left)
+                                        input_length=self.max_sent_len, trainable=self.non_static)(self.input_sent_left)
 
             self.w_emb_mid = Embedding(input_dim=len(self.vocb), output_dim=self.emb_dim,
-                                       input_length=self.max_sent_len, trainable=self.non_static)(self.input_x_mid)
+                                       input_length=self.max_sent_len, trainable=self.non_static)(self.input_sent_mid)
 
             self.w_emb_right = Embedding(input_dim=len(self.vocb), output_dim=self.emb_dim,
-                                         input_length=self.max_sent_len, trainable=self.non_static)(self.input_x_right)
+                                         input_length=self.max_sent_len, trainable=self.non_static)(self.input_sent_right)
 
         # Position Embedding
         # d1
@@ -133,9 +133,9 @@ class PCNN(object):
             pool_l_right = GlobalMaxPool1D()(conv_l_right)
 
             # Dropout
-            drop_l_left = Dropout(0.25)(pool_l_left)
-            drop_l_mid = Dropout(0.25)(pool_l_mid)
-            drop_l_right = Dropout(0.25)(pool_l_right)
+            drop_l_left = Dropout(self.dropout_rate)(pool_l_left)
+            drop_l_mid = Dropout(self.dropout_rate)(pool_l_mid)
+            drop_l_right = Dropout(self.dropout_rate)(pool_l_right)
 
             # Concat
             layer_lst.append(concatenate([drop_l_left, drop_l_mid, drop_l_right]))
@@ -143,9 +143,12 @@ class PCNN(object):
         self.concat_l = concatenate(layer_lst)
 
     def add_fc_layer(self):
-        self.fc_l_1 = Dense(128, activation='relu')(self.concat_l)
+        '''
+        self.fc_l_1 = Dense(300, activation='relu')(self.concat_l)
         self.fc_l_1 = Dropout(self.dropout_rate)(self.fc_l_1)
         self.pred_output = Dense(self.num_classes, activation='softmax')(self.fc_l_1)
+        '''
+        self.pred_output = Dense(self.num_classes, activation='softmax')(self.concat_l)
 
     def compile_model(self):
         self.model = Model(inputs=[self.input_sent_left, self.input_sent_mid, self.input_sent_right,

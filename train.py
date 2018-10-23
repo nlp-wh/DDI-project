@@ -4,11 +4,11 @@ from model import CNN, MCCNN, BILSTM
 ########### Hyperparameter ###########
 # 1. Training settings
 train_mode = 'cnn'
-nb_epoch = 10
+nb_epoch = 50
 batch_size = 200
-learning_rate = 0.001
+learning_rate = 0.0007
 optimizer = 'adam'
-use_pretrained = False  # If you're using pretrained, emb_dim will be 200 for PubMed-and-PMC-w2v.bin (http://evexdb.org/pmresources/vec-space-models/)
+use_pretrained = True  # If you're using pretrained, emb_dim will be 200 for PubMed-and-PMC-w2v.bin (http://evexdb.org/pmresources/vec-space-models/)
 dev_size = 0.1
 
 # 2. CNN specific

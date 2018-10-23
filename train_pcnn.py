@@ -1,14 +1,14 @@
 from load_data_ddi import load_data, sentence_split_for_pcnn
-from pcnn import PCNN
+from model_pcnn import PCNN
 
 ########### Hyperparameter ###########
 # 1. Training settings
 train_mode = 'cnn'
-nb_epoch = 10
-batch_size = 50
+nb_epoch = 50
+batch_size = 200
 learning_rate = 0.001
 optimizer = 'adam'
-use_pretrained = False  # If you're using pretrained, emb_dim will be 200 for PubMed-and-PMC-w2v.bin (http://evexdb.org/pmresources/vec-space-models/)
+use_pretrained = True  # If you're using pretrained, emb_dim will be 200 for PubMed-and-PMC-w2v.bin (http://evexdb.org/pmresources/vec-space-models/)
 dev_size = 0.1
 
 # 2. CNN specific
@@ -20,7 +20,7 @@ rnn_dim = 200  # Dimension for output of LSTM
 
 # 4. Model common settings
 emb_dim = 200
-pos_dim = 20
+pos_dim = 10
 max_sent_len = 150
 num_classes = 5
 unk_limit = 8000
@@ -41,13 +41,19 @@ if __name__ == '__main__':
         sentence_split_for_pcnn(sentences2idx=tr_sentences2idx, d1_pos_lst=tr_d1_pos_lst, d2_pos_lst=tr_d1_pos_lst,
                                 pos_tuple_lst=tr_pos_tuple_lst, max_sent_len=max_sent_len)
 
+    del tr_sentences2idx, tr_d1_pos_lst, tr_d2_pos_lst, tr_pos_tuple_lst
+
     (de_sent_left, de_d1_left, de_d2_left), (de_sent_mid, de_d1_mid, de_d2_mid), (de_sent_right, de_d1_right, de_d2_right) = \
         sentence_split_for_pcnn(sentences2idx=de_sentences2idx, d1_pos_lst=de_d1_pos_lst, d2_pos_lst=de_d1_pos_lst,
                                 pos_tuple_lst=de_pos_tuple_lst, max_sent_len=max_sent_len)
 
+    del de_sentences2idx, de_d1_pos_lst, de_d2_pos_lst, de_pos_tuple_lst
+
     (te_sent_left, te_d1_left, te_d2_left), (te_sent_mid, te_d1_mid, te_d2_mid), (te_sent_right, te_d1_right, te_d2_right) = \
         sentence_split_for_pcnn(sentences2idx=te_sentences2idx, d1_pos_lst=te_d1_pos_lst, d2_pos_lst=te_d1_pos_lst,
                                 pos_tuple_lst=te_pos_tuple_lst, max_sent_len=max_sent_len)
+
+    del te_sentences2idx, te_d1_pos_lst, te_d2_pos_lst, te_pos_tuple_lst
 
     model = PCNN(max_sent_len=max_sent_len,
                  vocb=vocb,
