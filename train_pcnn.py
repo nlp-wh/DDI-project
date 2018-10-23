@@ -1,12 +1,11 @@
 from load_data_ddi import load_data, sentence_split_for_pcnn
-from model_pcnn import PCNN
+from model import PCNN
 
 ########### Hyperparameter ###########
 # 1. Training settings
-train_mode = 'cnn'
-nb_epoch = 50
+nb_epoch = 10
 batch_size = 200
-learning_rate = 0.001
+learning_rate = 0.0005
 optimizer = 'adam'
 use_pretrained = True  # If you're using pretrained, emb_dim will be 200 for PubMed-and-PMC-w2v.bin (http://evexdb.org/pmresources/vec-space-models/)
 dev_size = 0.1
