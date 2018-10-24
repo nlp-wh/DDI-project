@@ -89,27 +89,23 @@ class CNN(object):
         # CNN Parts
         layer_lst = []
         for kernel_size in self.kernel_lst:
-            conv_l = Conv1D(filters=self.nb_filters, kernel_size=kernel_size, padding='valid', activation='relu')(self.emb_concat)
-            # pool_l = MaxPool1D(pool_size=self.max_sent_len - kernel_size + 1)(conv_l)
+            conv_l = Conv1D(filters=self.nb_filters, kernel_size=kernel_size, padding='valid')(self.emb_concat)
+            # conv_l = BatchNormalization()(conv_l)
+            conv_l = Activation('relu')(conv_l)
             pool_l = GlobalMaxPool1D()(conv_l)
-            # drop_l = Dropout(self.dropout_rate)(pool_l)
-            drop_l = Dropout(0.25)(pool_l)
-            # drop_l = BatchNormalization()(drop_l)
+            drop_l = Dropout(self.dropout_rate)(pool_l)
             # Append the final result
             layer_lst.append(drop_l)
 
-        self.concat_l = concatenate(layer_lst)
+        if len(layer_lst) != 1:
+            self.concat_l = concatenate(layer_lst)
+        else:
+            self.concat_l = layer_lst[0]
 
     def add_fc_layer(self):
-        # self.concat_drop_l = Dropout(self.dropout_rate)(self.concat_l)
-        # self.flat_l = Flatten()(self.concat_drop_l)
-        # self.flat_l = Flatten()(self.concat_l)
-        self.fc_l_1 = Dense(128, activation='relu')(self.concat_l)
-        self.fc_l_1 = Dropout(self.dropout_rate)(self.fc_l_1)
-        self.pred_output = Dense(self.num_classes, activation='softmax')(self.fc_l_1)
-        # self.concat_drop_l = Dropout(self.dropout_rate)(self.concat_l)
-        # self.flat_l = Flatten()(self.concat_drop_l)
-        # self.pred_output = Dense(self.num_classes, activation='softmax')(self.flat_l)
+        self.fc_l = Dense(128, activation='relu')(self.concat_l)
+        self.fc_l = Dropout(self.dropout_rate)(self.fc_l)
+        self.pred_output = Dense(self.num_classes, activation='softmax')(self.fc_l)
 
     def compile_model(self):
         self.model = Model(inputs=[self.input_x, self.input_d1, self.input_d2], outputs=self.pred_output)
@@ -506,31 +502,37 @@ class PCNN(CNN):
             conv_l_right = Activation('relu')(conv_l_right)
 
             # Maxpool
-            pool_l_left = GlobalMaxPool1D()(conv_l_left)
-            pool_l_mid = GlobalMaxPool1D()(conv_l_mid)
-            pool_l_right = GlobalMaxPool1D()(conv_l_right)
+            conv_l_left = GlobalMaxPool1D()(conv_l_left)
+            conv_l_mid = GlobalMaxPool1D()(conv_l_mid)
+            conv_l_right = GlobalMaxPool1D()(conv_l_right)
 
             # Dropout
-            drop_l_left = Dropout(self.dropout_rate)(pool_l_left)
-            drop_l_mid = Dropout(self.dropout_rate)(pool_l_mid)
-            drop_l_right = Dropout(self.dropout_rate)(pool_l_right)
+            conv_l_left = Dropout(self.dropout_rate)(conv_l_left)
+            conv_l_mid = Dropout(self.dropout_rate)(conv_l_mid)
+            conv_l_right = Dropout(self.dropout_rate)(conv_l_right)
 
             # Concat
-            layer_lst.append(concatenate([drop_l_left, drop_l_mid, drop_l_right]))
+            layer_lst.append(concatenate([conv_l_left, conv_l_mid, conv_l_right]))
 
-        self.concat_l = concatenate(layer_lst)
+        if len(layer_lst) != 1:
+            self.concat_l = concatenate(layer_lst)
+        else:
+            self.concat_l = layer_lst[0]
 
     def add_fc_layer(self):
-        self.fc_l_1 = Dense(600, activation='relu')(self.concat_l)
-        self.fc_l_1 = Dropout(self.dropout_rate)(self.fc_l_1)
-        self.fc_l_2 = Dense(300, activation='relu')(self.fc_l_1)
-        self.fc_l_2 = Dropout(self.dropout_rate)(self.fc_l_2)
-        self.fc_l_3 = Dense(128, activation='relu')(self.fc_l_2)
-        self.fc_l_3 = Dropout(self.dropout_rate)(self.fc_l_3)
-        self.pred_output = Dense(self.num_classes)(self.fc_l_3)
+        self.fc_l = Dense(600)(self.concat_l)
+        # self.fc_l = BatchNormalization()(self.fc_l)
+        self.fc_l = Activation('relu')(self.fc_l)
+        self.fc_l = Dropout(self.dropout_rate)(self.fc_l)
+        self.fc_l = Dense(300)(self.fc_l)
+        self.fc_l = Activation('relu')(self.fc_l)
+        self.fc_l = Dropout(self.dropout_rate)(self.fc_l)
+        self.fc_l = Dense(128)(self.fc_l)
+        self.fc_l = Activation('relu')(self.fc_l)
+        self.fc_l = Dropout(self.dropout_rate)(self.fc_l)
+        self.pred_output = Dense(self.num_classes)(self.fc_l)
         # self.pred_output = BatchNormalization()(self.pred_output)
         self.pred_output = Activation('softmax')(self.pred_output)
-        # self.pred_output = Dense(self.num_classes, activation='softmax')(self.concat_l)
 
     def compile_model(self):
         self.model = Model(inputs=[self.input_sent_left, self.input_sent_mid, self.input_sent_right,
