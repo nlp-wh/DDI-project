@@ -4,7 +4,7 @@ from model import CNN, MCCNN, BILSTM, PCNN
 ########### Hyperparameter ###########
 # 1. Training settings
 train_mode = 'pcnn'
-nb_epoch = 15
+nb_epoch = 10
 batch_size = 200
 learning_rate = 0.0005
 optimizer = 'adam'
@@ -66,7 +66,7 @@ if __name__ == '__main__':
                      nb_filters=nb_filters,
                      dropout_rate=dropout_rate,
                      optimizer=optimizer,
-                     non_static=False,
+                     non_static=True,
                      lr_rate=learning_rate,
                      use_pretrained=use_pretrained,
                      unk_limit=unk_limit,

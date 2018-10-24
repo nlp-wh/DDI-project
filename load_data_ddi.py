@@ -286,10 +286,10 @@ def load_data(unk_limit, max_sent_len, dev_size):
     te_d1_pos_lst = map_word_to_id(te_d1_pos_lst, d1_vocb)
     te_d2_pos_lst = map_word_to_id(te_d2_pos_lst, d2_vocb)
 
-    print("tr_d1_pos_lst[0]:", tr_d1_pos_lst[0])
-    print("tr_d2_pos_lst[0]:", tr_d2_pos_lst[0])
-    print("te_d1_pos_lst[0]:", te_d1_pos_lst[0])
-    print("te_d2_pos_lst[0]:", te_d2_pos_lst[0])
+    # print("tr_d1_pos_lst[0]:", tr_d1_pos_lst[0])
+    # print("tr_d2_pos_lst[0]:", tr_d2_pos_lst[0])
+    # print("te_d1_pos_lst[0]:", te_d1_pos_lst[0])
+    # print("te_d2_pos_lst[0]:", te_d2_pos_lst[0])
 
     # Build vocab only with train data
     vocb, vocb_inv = build_word_vocab(tr_sentences)

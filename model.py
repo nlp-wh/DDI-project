@@ -2,6 +2,7 @@ import numpy as np
 from keras.layers import Dense, Conv1D, MaxPool1D, Flatten, Dropout, Embedding, Input, concatenate, add, Bidirectional, LSTM, BatchNormalization, \
     GlobalMaxPool1D, Activation
 from keras import Model
+from keras import regularizers
 from keras.optimizers import Adam, Adadelta, RMSprop, Adagrad
 from sklearn.metrics import f1_score, recall_score, precision_score
 
@@ -369,9 +370,20 @@ class BILSTM(CNN):
             self.add_fc_layer()
         self.compile_model()
 
+    def write_hyperparam(self, nb_epoch, batch_size):
+        # mode: cnn | nb_epoch: 30 | batch: 200 | opt: adam | lr: 0.007 | pretrain: True | k_lst: [3, 4, 5] | nb_filters: 100 |
+        # emb_dim: 200 | pos_dim: 10 | sent_len: 150 | dropout: 0.8
+        # Write k_lst
+        log_str_1 = "mode: {} | nb_epoch: {} | batch: {} | opt: {} | lr: {} | pretrain: {}".format(type(self).__name__, nb_epoch, batch_size,
+                                                                                                   self.optimizer, self.lr_rate, self.use_pretrained)
+        log_str_2 = "rnn_dim: {} | emb_dim: {} | pos_dim: {} | sent_len: {} | dropout: {}".format(self.rnn_dim, self.emb_dim, self.pos_dim,
+                                                                                                  self.max_sent_len, self.dropout_rate)
+        return log_str_1, log_str_2
+
     def add_rnn_layer(self):
         self.rnn_l = Bidirectional(LSTM(self.rnn_dim, dropout=self.dropout_rate,
                                         recurrent_dropout=self.dropout_rate, return_sequences=True))(self.emb_concat)
+        self.rnn_l = BatchNormalization()(self.rnn_l)
 
     def add_self_att_layer(self):
         self.att_l = SeqSelfAttention(attention_activation='sigmoid')(self.rnn_l)
@@ -385,8 +397,10 @@ class BILSTM(CNN):
         self.pred_output = Dense(self.num_classes, activation='softmax')(self.dense_1000_l)
 
     def add_fc_layer(self):
-        self.flat_l = Flatten()(self.rnn_l)
-        self.pred_output = Dense(self.num_classes, activation='softmax')(self.flat_l)
+        self.rnn_l = Flatten()(self.rnn_l)
+        self.rnn_l = Dense(3000)(self.rnn_l)
+        self.rnn_l = Activation('relu')(self.rnn_l)
+        self.pred_output = Dense(self.num_classes, activation='softmax')(self.rnn_l)
 
 
 class PCNN(CNN):
@@ -525,13 +539,14 @@ class PCNN(CNN):
         self.fc_l = Activation('relu')(self.fc_l)
         self.fc_l = Dropout(self.dropout_rate)(self.fc_l)
         self.fc_l = Dense(300)(self.fc_l)
+        # self.fc_l = BatchNormalization()(self.fc_l)
         self.fc_l = Activation('relu')(self.fc_l)
         self.fc_l = Dropout(self.dropout_rate)(self.fc_l)
         self.fc_l = Dense(128)(self.fc_l)
+        # self.fc_l = BatchNormalization()(self.fc_l)
         self.fc_l = Activation('relu')(self.fc_l)
         self.fc_l = Dropout(self.dropout_rate)(self.fc_l)
         self.pred_output = Dense(self.num_classes)(self.fc_l)
-        # self.pred_output = BatchNormalization()(self.pred_output)
         self.pred_output = Activation('softmax')(self.pred_output)
 
     def compile_model(self):
@@ -558,8 +573,6 @@ class PCNN(CNN):
         # Unpack data
         (tr_sent_left, tr_d1_left, tr_d2_left), (tr_sent_mid, tr_d1_mid, tr_d2_mid), (tr_sent_right, tr_d1_right, tr_d2_right), tr_y = train_data
         (de_sent_left, de_d1_left, de_d2_left), (de_sent_mid, de_d1_mid, de_d2_mid), (de_sent_right, de_d1_right, de_d2_right), de_y = dev_data
-        # (tr_sentences2idx, tr_d1_pos_lst, tr_d2_pos_lst, tr_y) = train_data
-        # (de_sentences2idx, de_d1_pos_lst, de_d2_pos_lst, de_y) = dev_data
 
         # Write log
         logging.basicConfig(filename=os.path.join(result_dir, 'result.log'),
