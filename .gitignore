@@ -109,3 +109,4 @@ word2vec
 data
 .idea
 output.tsv
+tf_board_log

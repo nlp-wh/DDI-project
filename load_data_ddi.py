@@ -321,7 +321,7 @@ def load_data(unk_limit, max_sent_len, dev_size):
                                                                                                   tr_pos_tuple_lst,
                                                                                                   tr_y,
                                                                                                   dev_size=dev_size,
-                                                                                                  shuffle=False)
+                                                                                                  shuffle=True)
 
     return (tr_sentences2idx, tr_d1_pos_lst, tr_d2_pos_lst, tr_pos_tuple_lst, tr_y), \
            (de_sentences2idx, de_d1_pos_lst, de_d2_pos_lst, de_pos_tuple_lst, de_y), \

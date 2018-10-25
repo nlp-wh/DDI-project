@@ -1,8 +1,9 @@
 import numpy as np
 from keras.layers import Dense, Conv1D, MaxPool1D, Flatten, Dropout, Embedding, Input, concatenate, add, Bidirectional, LSTM, BatchNormalization, \
-    GlobalMaxPool1D, Activation
+    GlobalMaxPool1D, Activation, SeparableConv1D
 from keras import Model
 from keras import regularizers
+from keras.callbacks import EarlyStopping, ModelCheckpoint, ReduceLROnPlateau, TensorBoard
 from keras.optimizers import Adam, Adadelta, RMSprop, Adagrad
 from sklearn.metrics import f1_score, recall_score, precision_score
 
@@ -17,6 +18,23 @@ from seq_self_attention import SeqSelfAttention
 result_dir = 'result'
 if not os.path.exists(result_dir):
     os.mkdir(result_dir)
+
+# Make tensorboard log directory
+tf_board_dir = 'tf_board_log'
+if not os.path.exists(tf_board_dir):
+    os.mkdir(tf_board_dir)
+
+################ CallBack ################
+callback_list = [
+    # 1. Early Stopping Callback
+    EarlyStopping(monitor='val_loss', patience=6),
+    # 2. Model Checkpoint
+    ModelCheckpoint(filepath=os.path.join(result_dir, 'weights.h5'), monitor='val_loss', save_best_only=True),
+    # 3. Reducing Learning rate automatically
+    ReduceLROnPlateau(monitor='val_loss', patience=3, factor=0.8),  # Reduce the lr_rate into 10%
+    # 4. Tensorboard callback
+    TensorBoard(log_dir=tf_board_dir, histogram_freq=0, write_graph=True, write_grads=True, write_images=True)
+]
 
 
 class CNN(object):
@@ -538,10 +556,10 @@ class PCNN(CNN):
         # self.fc_l = BatchNormalization()(self.fc_l)
         self.fc_l = Activation('relu')(self.fc_l)
         self.fc_l = Dropout(self.dropout_rate)(self.fc_l)
-        self.fc_l = Dense(300)(self.fc_l)
+        # self.fc_l = Dense(300)(self.fc_l)
         # self.fc_l = BatchNormalization()(self.fc_l)
-        self.fc_l = Activation('relu')(self.fc_l)
-        self.fc_l = Dropout(self.dropout_rate)(self.fc_l)
+        # self.fc_l = Activation('relu')(self.fc_l)
+        # self.fc_l = Dropout(self.dropout_rate)(self.fc_l)
         self.fc_l = Dense(128)(self.fc_l)
         # self.fc_l = BatchNormalization()(self.fc_l)
         self.fc_l = Activation('relu')(self.fc_l)
@@ -588,42 +606,44 @@ class PCNN(CNN):
         logger.info(log_str_2)
         logger.info('')
 
-        max_val_f1 = 0
-        for i in range(nb_epoch):
-            # Training
-            train_history = self.model.fit(x=[tr_sent_left, tr_sent_mid, tr_sent_right, tr_d1_left, tr_d1_mid, tr_d1_right,
-                                              tr_d2_left, tr_d2_mid, tr_d2_right], y=tr_y, epochs=1, batch_size=batch_size, verbose=1)
-            # Metrics for Train data
-            pred_tr = self.model.predict(x=[tr_sent_left, tr_sent_mid, tr_sent_right, tr_d1_left, tr_d1_mid, tr_d1_right,
-                                            tr_d2_left, tr_d2_mid, tr_d2_right], batch_size=batch_size, verbose=1)
-            train_loss = train_history.history['loss'][0]
-            train_acc = train_history.history['acc'][0]
-            train_f1 = f1_score(np.argmax(tr_y, 1), np.argmax(pred_tr, 1), [1, 2, 3, 4], average='micro')
-            train_p = precision_score(np.argmax(tr_y, 1), np.argmax(pred_tr, 1), [1, 2, 3, 4], average='micro')
-            train_r = recall_score(np.argmax(tr_y, 1), np.argmax(pred_tr, 1), [1, 2, 3, 4], average='micro')
+        # Training
+        train_history = self.model.fit(x=[tr_sent_left, tr_sent_mid, tr_sent_right, tr_d1_left, tr_d1_mid, tr_d1_right,
+                                          tr_d2_left, tr_d2_mid, tr_d2_right], y=tr_y, epochs=nb_epoch, batch_size=batch_size, verbose=1,
+                                       validation_data=[[de_sent_left, de_sent_mid, de_sent_right, de_d1_left, de_d1_mid, de_d1_right,
+                                                         de_d2_left, de_d2_mid, de_d2_right], de_y], callbacks=callback_list)
 
-            # Metrics for Dev data
-            pred_de = self.model.predict(x=[de_sent_left, de_sent_mid, de_sent_right, de_d1_left, de_d1_mid, de_d1_right,
-                                            de_d2_left, de_d2_mid, de_d2_right], batch_size=batch_size, verbose=1)
-            val_f1 = f1_score(np.argmax(de_y, 1), np.argmax(pred_de, 1), [1, 2, 3, 4], average='micro')
-            val_p = precision_score(np.argmax(de_y, 1), np.argmax(pred_de, 1), [1, 2, 3, 4], average='micro')
-            val_r = recall_score(np.argmax(de_y, 1), np.argmax(pred_de, 1), [1, 2, 3, 4], average='micro')
-            # Writing the log
-            logger.info('##train##, epoch: {:2d}, loss: {:.4f}, acc: {:.4f}, prec: {:.4f}, recall: {:.4f}, F1: {:.4f}'.format((i + 1),
-                                                                                                                              train_loss,
-                                                                                                                              train_acc,
-                                                                                                                              train_p,
-                                                                                                                              train_r,
-                                                                                                                              train_f1))
-            logger.info('##dev##,   epoch: {:2d}, prec: {:.4f}, recall: {:.4f}, F1: {:.4f}'.format((i + 1),
-                                                                                                   val_p,
-                                                                                                   val_r,
-                                                                                                   val_f1))
-            # Saving the weight if it is better than before (early-stopping)
-            if max_val_f1 < val_f1:
-                max_val_f1 = val_f1
-                logging.info("[{}th epoch, Better performance! Update the weight!]".format(i + 1))
-                self.model.save_weights(os.path.join(result_dir, 'weights.h5'))
+        # Metrics for Train data
+        pred_tr = self.model.predict(x=[tr_sent_left, tr_sent_mid, tr_sent_right, tr_d1_left, tr_d1_mid, tr_d1_right,
+                                        tr_d2_left, tr_d2_mid, tr_d2_right], batch_size=batch_size, verbose=1)
+        train_loss = train_history.history['loss'][0]
+        train_acc = train_history.history['acc'][0]
+        train_f1 = f1_score(np.argmax(tr_y, 1), np.argmax(pred_tr, 1), [1, 2, 3, 4], average='micro')
+        train_p = precision_score(np.argmax(tr_y, 1), np.argmax(pred_tr, 1), [1, 2, 3, 4], average='micro')
+        train_r = recall_score(np.argmax(tr_y, 1), np.argmax(pred_tr, 1), [1, 2, 3, 4], average='micro')
+
+        # Metrics for Dev data
+        pred_de = self.model.predict(x=[de_sent_left, de_sent_mid, de_sent_right, de_d1_left, de_d1_mid, de_d1_right,
+                                        de_d2_left, de_d2_mid, de_d2_right], batch_size=batch_size, verbose=1)
+        val_f1 = f1_score(np.argmax(de_y, 1), np.argmax(pred_de, 1), [1, 2, 3, 4], average='micro')
+        val_p = precision_score(np.argmax(de_y, 1), np.argmax(pred_de, 1), [1, 2, 3, 4], average='micro')
+        val_r = recall_score(np.argmax(de_y, 1), np.argmax(pred_de, 1), [1, 2, 3, 4], average='micro')
+
+        # Writing the log
+        logger.info('##train##, loss: {:.4f}, acc: {:.4f}, prec: {:.4f}, recall: {:.4f}, F1: {:.4f}'.format(
+            train_loss, train_acc, train_p, train_r, train_f1))
+        logger.info('##dev##,   prec: {:.4f}, recall: {:.4f}, F1: {:.4f}'.format(val_p, val_r, val_f1))
+        # Saving the weight if it is better than before (early-stopping)
+        # if max_val_f1 < val_f1:
+        # max_val_f1 = val_f1
+        # logging.info("[{}th epoch, Better performance! Update the weight!]".format(i + 1))
+        # self.model.save_weights(os.path.join(result_dir, 'weights.h5'))
+
+        # TODO: concat train, dev / Then train with this concat data
+        # self.model.fit(x=[np.concatenate([tr_sent_left, de_sent_left]), np.concatenate([tr_sent_mid, de_sent_mid]), np.concatenate([tr_sent_right, de_sent_right]),
+        #                   np.concatenate([tr_d1_left, de_d1_left]), np.concatenate(
+        #                       [tr_d1_mid, de_d1_mid]), np.concatenate([tr_d1_right, de_d1_right]),
+        #                   np.concatenate([tr_d2_left, de_d2_left]), np.concatenate([tr_d2_mid, de_d2_mid]), np.concatenate([tr_d2_right, de_d2_right])], y=np.concatenate([tr_y, de_y]),
+        #                epochs=1, batch_size=batch_size, verbose=1)
 
     def evaluate(self, test_data, batch_size):
         (te_sent_left, te_d1_left, te_d2_left), (te_sent_mid, te_d1_mid, te_d2_mid), (te_sent_right, te_d1_right, te_d2_right), te_y = test_data
