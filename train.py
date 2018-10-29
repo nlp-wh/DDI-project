@@ -5,11 +5,12 @@ from model import CNN, MCCNN, BILSTM, PCNN
 # 1. Training settings
 train_mode = 'pcnn'
 nb_epoch = 100
-batch_size = 64
+batch_size = 128
 learning_rate = 0.0005
 optimizer = 'adam'
 use_pretrained = True  # If you're using pretrained, emb_dim will be 200 for PubMed-and-PMC-w2v.bin (http://evexdb.org/pmresources/vec-space-models/)
 dev_size = 0.1
+hidden_unit_size = 256
 
 # 2. CNN specific
 kernel_lst = [3, 5, 7]
@@ -70,7 +71,8 @@ if __name__ == '__main__':
                      lr_rate=learning_rate,
                      use_pretrained=use_pretrained,
                      unk_limit=unk_limit,
-                     num_classes=num_classes)
+                     num_classes=num_classes,
+                     hidden_unit_size=hidden_unit_size)
 
         model.show_model_summary()
         model.save_model()
@@ -96,7 +98,8 @@ if __name__ == '__main__':
                         lr_rate=learning_rate,
                         use_pretrained=use_pretrained,
                         unk_limit=unk_limit,
-                        num_classes=num_classes)
+                        num_classes=num_classes,
+                        hidden_unit_size=hidden_unit_size)
 
         elif train_mode.lower() == 'mccnn':
             model = MCCNN(max_sent_len=max_sent_len,

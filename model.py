@@ -7,6 +7,11 @@ from keras.callbacks import EarlyStopping, ModelCheckpoint, ReduceLROnPlateau, T
 from keras.optimizers import Adam, Adadelta, RMSprop, Adagrad
 from sklearn.metrics import f1_score, recall_score, precision_score
 
+# AutoML library
+from hyperopt import Trials, STATUS_OK, tpe
+from hyperas import optim
+from hyperas.distributions import uniform, choice
+
 import os
 import sys
 import logging
@@ -31,9 +36,9 @@ callback_list = [
     # 2. Model Checkpoint
     ModelCheckpoint(filepath=os.path.join(result_dir, 'weights.h5'), monitor='val_loss', save_best_only=True),
     # 3. Reducing Learning rate automatically
-    ReduceLROnPlateau(monitor='val_loss', patience=4, factor=0.5),  # Reduce the lr_rate into 10%
+    ReduceLROnPlateau(monitor='val_loss', patience=4, factor=0.1),  # Reduce the lr_rate into 10%
     # 4. Tensorboard callback
-    TensorBoard(log_dir=tf_board_dir, histogram_freq=0, write_graph=True, write_grads=True, write_images=True)
+    # TensorBoard(log_dir=tf_board_dir, histogram_freq=0, write_graph=True, write_grads=True, write_images=True)
 ]
 
 
@@ -53,7 +58,8 @@ class CNN(object):
                  lr_rate=0.001,
                  non_static=True,
                  use_pretrained=False,
-                 unk_limit=10000):
+                 unk_limit=10000,
+                 hidden_unit_size=128):
         self.max_sent_len = max_sent_len
         self.vocb = vocb
         self.d1_vocb = d1_vocb
@@ -69,6 +75,7 @@ class CNN(object):
         self.use_pretrained = use_pretrained
         self.unk_limit = unk_limit
         self.num_classes = num_classes
+        self.hidden_unit_size = hidden_unit_size
         self.build_model()
 
     def build_model(self):
@@ -122,7 +129,9 @@ class CNN(object):
             self.concat_l = layer_lst[0]
 
     def add_fc_layer(self):
-        self.fc_l = Dense(128, activation='relu')(self.concat_l)
+        self.fc_l = Dense(self.hidden_unit_size)(self.concat_l)
+        self.fc_l = BatchNormalization()(self.fc_l)
+        self.fc_l = Activation('relu')(self.fc_l)
         self.fc_l = Dropout(self.dropout_rate)(self.fc_l)
         self.pred_output = Dense(self.num_classes, activation='softmax')(self.fc_l)
 
@@ -425,7 +434,8 @@ class PCNN(CNN):
                  lr_rate=0.001,
                  non_static=True,
                  use_pretrained=False,
-                 unk_limit=10000):
+                 unk_limit=10000,
+                 hidden_unit_size=128):
         self.max_sent_len = max_sent_len
         self.vocb = vocb
         self.d1_vocb = d1_vocb
@@ -441,6 +451,7 @@ class PCNN(CNN):
         self.use_pretrained = use_pretrained
         self.unk_limit = unk_limit
         self.num_classes = num_classes
+        self.hidden_unit_size = hidden_unit_size
         self.build_model()
 
     def add_input_layer(self):
@@ -512,9 +523,9 @@ class PCNN(CNN):
             conv_l_right = Conv1D(filters=self.nb_filters, kernel_size=kernel_size, padding='same')(self.emb_concat_right)
 
             # Batch normalization
-            # conv_l_left = BatchNormalization()(conv_l_left)
-            # conv_l_mid = BatchNormalization()(conv_l_mid)
-            # conv_l_right = BatchNormalization()(conv_l_right)
+            conv_l_left = BatchNormalization()(conv_l_left)
+            conv_l_mid = BatchNormalization()(conv_l_mid)
+            conv_l_right = BatchNormalization()(conv_l_right)
 
             # Activation
             conv_l_left = Activation('relu')(conv_l_left)
@@ -540,8 +551,8 @@ class PCNN(CNN):
             self.concat_l = layer_lst[0]
 
     def add_fc_layer(self):
-        self.fc_l = Dense(600)(self.concat_l)
-        # self.fc_l = BatchNormalization()(self.fc_l)
+        self.fc_l = Dense(self.hidden_unit_size)(self.concat_l)
+        self.fc_l = BatchNormalization()(self.fc_l)
         self.fc_l = Activation('relu')(self.fc_l)
         self.fc_l = Dropout(self.dropout_rate)(self.fc_l)
         # self.fc_l = Dense(300)(self.fc_l)
