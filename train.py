@@ -4,7 +4,7 @@ from model import CNN, MCCNN, BILSTM, PCNN, MC_PCNN
 ########### Hyperparameter ###########
 # 1. Training settings
 train_mode = 'mcpcnn'
-nb_epoch = 10
+nb_epoch = 100
 batch_size = 128
 learning_rate = 0.0005
 optimizer = 'adam'

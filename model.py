@@ -32,11 +32,11 @@ if not os.path.exists(tf_board_dir):
 # CallBack setting
 callback_list = [
     # 1. Early Stopping Callback
-    EarlyStopping(monitor='val_loss', patience=10),
+    EarlyStopping(monitor='val_loss', patience=8),
     # 2. Model Checkpoint
     ModelCheckpoint(filepath=os.path.join(result_dir, 'weights.h5'), monitor='val_loss', save_best_only=True),
     # 3. Reducing Learning rate automatically
-    ReduceLROnPlateau(monitor='val_loss', patience=5, factor=0.3),  # Reduce the lr_rate into 10%
+    ReduceLROnPlateau(monitor='val_loss', patience=4, factor=0.3),  # Reduce the lr_rate into 10%
     # 4. Tensorboard callback
     # TensorBoard(log_dir=tf_board_dir, histogram_freq=0, write_graph=True, write_grads=True, write_images=True)
 ]
@@ -202,6 +202,9 @@ class CNN(object):
         # Training
         train_history = self.model.fit(x=[tr_sentences2idx, tr_d1_pos_lst, tr_d2_pos_lst], y=tr_y, epochs=nb_epoch, batch_size=batch_size,
                                        verbose=1, validation_data=[[de_sentences2idx, de_d1_pos_lst, de_d2_pos_lst], de_y], callbacks=callback_list)
+
+        # load the best result
+        self.model.load_weights(os.path.join(result_dir, 'weights.h5'))
 
         # Metrics for Train data
         pred_tr = self.model.predict(x=[tr_sentences2idx, tr_d1_pos_lst, tr_d2_pos_lst], batch_size=batch_size, verbose=1)
@@ -613,6 +616,9 @@ class PCNN(CNN):
                                           tr_d2_left, tr_d2_mid, tr_d2_right], y=tr_y, epochs=nb_epoch, batch_size=batch_size, verbose=1,
                                        validation_data=[[de_sent_left, de_sent_mid, de_sent_right, de_d1_left, de_d1_mid, de_d1_right,
                                                          de_d2_left, de_d2_mid, de_d2_right], de_y], callbacks=callback_list)
+
+        # load the best result
+        self.model.load_weights(os.path.join(result_dir, 'weights.h5'))
 
         # Metrics for Train data
         pred_tr = self.model.predict(x=[tr_sent_left, tr_sent_mid, tr_sent_right, tr_d1_left, tr_d1_mid, tr_d1_right,
