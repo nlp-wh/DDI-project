@@ -36,7 +36,7 @@ callback_list = [
     # 2. Model Checkpoint
     ModelCheckpoint(filepath=os.path.join(result_dir, 'weights.h5'), monitor='val_loss', save_best_only=True),
     # 3. Reducing Learning rate automatically
-    ReduceLROnPlateau(monitor='val_loss', patience=5, factor=0.1),  # Reduce the lr_rate into 10%
+    ReduceLROnPlateau(monitor='val_loss', patience=5, factor=0.3),  # Reduce the lr_rate into 10%
     # 4. Tensorboard callback
     # TensorBoard(log_dir=tf_board_dir, histogram_freq=0, write_graph=True, write_grads=True, write_images=True)
 ]
@@ -59,7 +59,8 @@ class CNN(object):
                  non_static=True,
                  use_pretrained=False,
                  unk_limit=10000,
-                 hidden_unit_size=128):
+                 hidden_unit_size=128,
+                 use_batch_norm=False):
         self.max_sent_len = max_sent_len
         self.vocb = vocb
         self.d1_vocb = d1_vocb
@@ -76,6 +77,7 @@ class CNN(object):
         self.unk_limit = unk_limit
         self.num_classes = num_classes
         self.hidden_unit_size = hidden_unit_size
+        self.use_batch_norm = use_batch_norm
         self.build_model()
 
     def build_model(self):
@@ -116,7 +118,8 @@ class CNN(object):
         layer_lst = []
         for kernel_size in self.kernel_lst:
             conv_l = Conv1D(filters=self.nb_filters, kernel_size=kernel_size, padding='valid')(self.emb_concat)
-            # conv_l = BatchNormalization()(conv_l)
+            if self.use_batch_norm:
+                conv_l = BatchNormalization()(conv_l)
             conv_l = Activation('relu')(conv_l)
             pool_l = GlobalMaxPool1D()(conv_l)
             drop_l = Dropout(self.dropout_rate)(pool_l)
@@ -130,7 +133,8 @@ class CNN(object):
 
     def add_fc_layer(self):
         self.fc_l = Dense(self.hidden_unit_size)(self.concat_l)
-        self.fc_l = BatchNormalization()(self.fc_l)
+        if self.use_batch_norm:
+            self.fc_l = BatchNormalization()(self.fc_l)
         self.fc_l = Activation('relu')(self.fc_l)
         self.fc_l = Dropout(self.dropout_rate)(self.fc_l)
         self.pred_output = Dense(self.num_classes, activation='softmax')(self.fc_l)
@@ -435,7 +439,8 @@ class PCNN(CNN):
                  non_static=True,
                  use_pretrained=False,
                  unk_limit=10000,
-                 hidden_unit_size=128):
+                 hidden_unit_size=128,
+                 use_batch_norm=False):
         self.max_sent_len = max_sent_len
         self.vocb = vocb
         self.d1_vocb = d1_vocb
@@ -452,6 +457,7 @@ class PCNN(CNN):
         self.unk_limit = unk_limit
         self.num_classes = num_classes
         self.hidden_unit_size = hidden_unit_size
+        self.use_batch_norm = use_batch_norm
         self.build_model()
 
     def add_input_layer(self):
@@ -526,9 +532,10 @@ class PCNN(CNN):
             conv_l_right = conv_layer(self.emb_concat_right)
 
             # Batch normalization
-            # conv_l_left = BatchNormalization()(conv_l_left)
-            # conv_l_mid = BatchNormalization()(conv_l_mid)
-            # conv_l_right = BatchNormalization()(conv_l_right)
+            if self.use_batch_norm:
+                conv_l_left = BatchNormalization()(conv_l_left)
+                conv_l_mid = BatchNormalization()(conv_l_mid)
+                conv_l_right = BatchNormalization()(conv_l_right)
 
             # Activation
             conv_l_left = Activation('relu')(conv_l_left)
@@ -556,17 +563,9 @@ class PCNN(CNN):
     def add_fc_layer(self):
         self.fc_l = self.concat_l
         self.fc_l = Dense(self.hidden_unit_size)(self.fc_l)
-        # self.fc_l = BatchNormalization()(self.fc_l)
+        if self.use_batch_norm:
+            self.fc_l = BatchNormalization()(self.fc_l)
         self.fc_l = Activation('relu')(self.fc_l)
-        self.fc_l = Dropout(self.dropout_rate)(self.fc_l)
-        # self.fc_l = Dense(300)(self.fc_l)
-        # self.fc_l = BatchNormalization()(self.fc_l)
-        # self.fc_l = Activation('relu')(self.fc_l)
-        # self.fc_l = Dropout(self.dropout_rate)(self.fc_l)
-        # self.fc_l = Dense(128)(self.fc_l)
-        # # self.fc_l = BatchNormalization()(self.fc_l)
-        # self.fc_l = Activation('relu')(self.fc_l)
-        # self.fc_l = Dropout(self.dropout_rate)(self.fc_l)
         self.pred_output = Dense(self.num_classes)(self.fc_l)
         self.pred_output = Activation('softmax')(self.pred_output)
 
@@ -666,7 +665,8 @@ class MC_PCNN(PCNN):
                  lr_rate=0.001,
                  non_static=True,
                  unk_limit=10000,
-                 hidden_unit_size=128):
+                 hidden_unit_size=128,
+                 use_batch_norm=False):
         self.max_sent_len = max_sent_len
         self.vocb = vocb
         self.d1_vocb = d1_vocb
@@ -682,6 +682,7 @@ class MC_PCNN(PCNN):
         self.unk_limit = unk_limit
         self.num_classes = num_classes
         self.hidden_unit_size = hidden_unit_size
+        self.use_batch_norm = use_batch_norm
         self.build_model()
 
     def add_embedding_layer(self):
@@ -756,9 +757,10 @@ class MC_PCNN(PCNN):
             conv_l_right = conv_layer(padded_emb_concat_right)
 
             # Batch normalization
-            # conv_l_left = BatchNormalization()(conv_l_left)
-            # conv_l_mid = BatchNormalization()(conv_l_mid)
-            # conv_l_right = BatchNormalization()(conv_l_right)
+            if self.use_batch_norm:
+                conv_l_left = BatchNormalization()(conv_l_left)
+                conv_l_mid = BatchNormalization()(conv_l_mid)
+                conv_l_right = BatchNormalization()(conv_l_right)
 
             # Activation
             conv_l_left = Activation('relu')(conv_l_left)
@@ -786,7 +788,8 @@ class MC_PCNN(PCNN):
     def add_fc_layer(self):
         self.fc_l = self.concat_l
         self.fc_l = Dense(self.hidden_unit_size)(self.fc_l)
-        # self.fc_l = BatchNormalization()(self.fc_l)
+        if self.use_batch_norm:
+            self.fc_l = BatchNormalization()(self.fc_l)
         self.fc_l = Activation('relu')(self.fc_l)
         self.fc_l = Dropout(self.dropout_rate)(self.fc_l)
         self.pred_output = Dense(self.num_classes)(self.fc_l)

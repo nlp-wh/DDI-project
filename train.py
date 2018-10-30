@@ -5,16 +5,17 @@ from model import CNN, MCCNN, BILSTM, PCNN, MC_PCNN
 # 1. Training settings
 train_mode = 'mcpcnn'
 nb_epoch = 100
-batch_size = 64
-learning_rate = 0.0007
+batch_size = 128
+learning_rate = 0.0005
 optimizer = 'adam'
 use_pretrained = True  # If you're using pretrained, emb_dim will be 200 for PubMed-and-PMC-w2v.bin (http://evexdb.org/pmresources/vec-space-models/)
 dev_size = 0.1
 hidden_unit_size = 256 * 2
+use_batch_norm = True
 
 # 2. CNN specific
-kernel_lst = [3, 5, 7]
-nb_filters = 100
+kernel_lst = [6, 7, 8, 9]  # [3, 5, 7]
+nb_filters = 200
 
 # 3. RNN specific
 rnn_dim = 200  # Dimension for output of LSTM
@@ -73,23 +74,25 @@ if __name__ == '__main__':
                          use_pretrained=use_pretrained,
                          unk_limit=unk_limit,
                          num_classes=num_classes,
-                         hidden_unit_size=hidden_unit_size)
+                         hidden_unit_size=hidden_unit_size,
+                         use_batch_norm=use_batch_norm)
         else:
             model = MC_PCNN(max_sent_len=max_sent_len,
-                        vocb=vocb,
-                        d1_vocb=d1_vocb,
-                        d2_vocb=d2_vocb,
-                        emb_dim=emb_dim,
-                        pos_dim=pos_dim,
-                        kernel_lst=kernel_lst,
-                        nb_filters=nb_filters,
-                        dropout_rate=dropout_rate,
-                        optimizer=optimizer,
-                        non_static=True,
-                        lr_rate=learning_rate,
-                        unk_limit=unk_limit,
-                        num_classes=num_classes,
-                        hidden_unit_size=hidden_unit_size)
+                            vocb=vocb,
+                            d1_vocb=d1_vocb,
+                            d2_vocb=d2_vocb,
+                            emb_dim=emb_dim,
+                            pos_dim=pos_dim,
+                            kernel_lst=kernel_lst,
+                            nb_filters=nb_filters,
+                            dropout_rate=dropout_rate,
+                            optimizer=optimizer,
+                            non_static=True,
+                            lr_rate=learning_rate,
+                            unk_limit=unk_limit,
+                            num_classes=num_classes,
+                            hidden_unit_size=hidden_unit_size,
+                            use_batch_norm=use_batch_norm)
 
         model.show_model_summary()
         model.save_model()
@@ -132,7 +135,8 @@ if __name__ == '__main__':
                           lr_rate=learning_rate,
                           use_pretrained=use_pretrained,
                           unk_limit=unk_limit,
-                          num_classes=num_classes)
+                          num_classes=num_classes,
+                          use_batch_norm=use_batch_norm)
 
         elif train_mode.lower() == 'rnn':
             model = BILSTM(max_sent_len=max_sent_len,
