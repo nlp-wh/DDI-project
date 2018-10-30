@@ -746,7 +746,10 @@ class MC_PCNN(PCNN):
             conv_layer = Conv2D(self.nb_filters, kernel_size=(kernel_size, self.emb_dim + self.pos_dim * 2), padding='valid')
 
             # zero padding on embedding layer, only on height
-            padding_size = int((kernel_size-1)/2)
+            if kernel_size % 2 == 0:
+                padding_size = int(kernel_size/2)
+            else:
+                padding_size = int((kernel_size-1)/2)
             padded_emb_concat_left = ZeroPadding2D((padding_size, 0))(self.emb_concat_left)
             padded_emb_concat_mid = ZeroPadding2D((padding_size, 0))(self.emb_concat_mid)
             padded_emb_concat_right = ZeroPadding2D((padding_size, 0))(self.emb_concat_right)
