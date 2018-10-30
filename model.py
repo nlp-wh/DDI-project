@@ -517,10 +517,13 @@ class PCNN(CNN):
         # CNN Parts
         layer_lst = []
         for kernel_size in self.kernel_lst:
+            # Sharing the filter weight
+            conv_layer = Conv1D(filters=self.nb_filters, kernel_size=kernel_size, padding='same')
+
             # left, mid, right convolution
-            conv_l_left = Conv1D(filters=self.nb_filters, kernel_size=kernel_size, padding='same')(self.emb_concat_left)
-            conv_l_mid = Conv1D(filters=self.nb_filters, kernel_size=kernel_size, padding='same')(self.emb_concat_mid)
-            conv_l_right = Conv1D(filters=self.nb_filters, kernel_size=kernel_size, padding='same')(self.emb_concat_right)
+            conv_l_left = conv_layer(self.emb_concat_left)
+            conv_l_mid = conv_layer(self.emb_concat_mid)
+            conv_l_right = conv_layer(self.emb_concat_right)
 
             # Batch normalization
             conv_l_left = BatchNormalization()(conv_l_left)
@@ -551,7 +554,8 @@ class PCNN(CNN):
             self.concat_l = layer_lst[0]
 
     def add_fc_layer(self):
-        self.fc_l = Dense(self.hidden_unit_size)(self.concat_l)
+        self.fc_l = self.concat_l
+        self.fc_l = Dense(self.hidden_unit_size)(self.fc_l)
         self.fc_l = BatchNormalization()(self.fc_l)
         self.fc_l = Activation('relu')(self.fc_l)
         self.fc_l = Dropout(self.dropout_rate)(self.fc_l)
