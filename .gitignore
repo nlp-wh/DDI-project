@@ -105,8 +105,11 @@ venv.bak/
 
 #################################################################
 result
-word2vec
-data
+word2vec/*.bin
+data/neg_filtered
+data/new_data
+data/orig
+data/vocab
 .idea
 output.tsv
 tf_board_log

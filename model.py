@@ -1,6 +1,6 @@
 import numpy as np
 from keras.layers import Dense, Conv1D, MaxPool1D, Flatten, Dropout, Embedding, Input, concatenate, add, Bidirectional, LSTM, BatchNormalization, \
-    GlobalMaxPool1D, Activation, SeparableConv1D
+    GlobalMaxPool1D, Activation, SeparableConv1D, Reshape, Conv2D, GlobalMaxPool2D, ZeroPadding2D
 from keras import Model
 from keras.regularizers import l1, l2, l1_l2
 from keras.callbacks import EarlyStopping, ModelCheckpoint, ReduceLROnPlateau, TensorBoard
@@ -16,7 +16,7 @@ import os
 import sys
 import logging
 
-from load_data_ddi import load_word_matrix, load_test_pair_id
+from load_data_ddi import load_word_matrix, load_test_pair_id, load_word_matrix_all
 from seq_self_attention import SeqSelfAttention
 
 # Make the directory for saving model, weight, log
@@ -32,11 +32,11 @@ if not os.path.exists(tf_board_dir):
 # CallBack setting
 callback_list = [
     # 1. Early Stopping Callback
-    EarlyStopping(monitor='val_loss', patience=8),
+    EarlyStopping(monitor='val_loss', patience=10),
     # 2. Model Checkpoint
     ModelCheckpoint(filepath=os.path.join(result_dir, 'weights.h5'), monitor='val_loss', save_best_only=True),
     # 3. Reducing Learning rate automatically
-    ReduceLROnPlateau(monitor='val_loss', patience=4, factor=0.1),  # Reduce the lr_rate into 10%
+    ReduceLROnPlateau(monitor='val_loss', patience=5, factor=0.1),  # Reduce the lr_rate into 10%
     # 4. Tensorboard callback
     # TensorBoard(log_dir=tf_board_dir, histogram_freq=0, write_graph=True, write_grads=True, write_images=True)
 ]
@@ -169,8 +169,8 @@ class CNN(object):
             k_lst_str += "{} ".format(kernel)
         k_lst_str = k_lst_str.rstrip()
         k_lst_str += "]"
-        log_str_1 = "mode: {} | nb_epoch: {} | batch: {} | opt: {} | lr: {} | pretrain: {}".format(type(self).__name__, nb_epoch, batch_size,
-                                                                                                   self.optimizer, self.lr_rate, self.use_pretrained)
+        log_str_1 = "mode: {} | nb_epoch: {} | batch: {} | opt: {} | lr: {} | pretrain: {} | hidden_unit_size: {}".format(type(self).__name__, nb_epoch, batch_size,
+                                                                                                                          self.optimizer, self.lr_rate, self.use_pretrained, self.hidden_unit_size)
         log_str_2 = "k_lst: {} | nb_filters: {} | emb_dim: {} | pos_dim: {} | sent_len: {} | dropout: {}".format(k_lst_str, self.nb_filters,
                                                                                                                  self.emb_dim, self.pos_dim,
                                                                                                                  self.max_sent_len, self.dropout_rate)
@@ -526,9 +526,9 @@ class PCNN(CNN):
             conv_l_right = conv_layer(self.emb_concat_right)
 
             # Batch normalization
-            conv_l_left = BatchNormalization()(conv_l_left)
-            conv_l_mid = BatchNormalization()(conv_l_mid)
-            conv_l_right = BatchNormalization()(conv_l_right)
+            # conv_l_left = BatchNormalization()(conv_l_left)
+            # conv_l_mid = BatchNormalization()(conv_l_mid)
+            # conv_l_right = BatchNormalization()(conv_l_right)
 
             # Activation
             conv_l_left = Activation('relu')(conv_l_left)
@@ -556,7 +556,7 @@ class PCNN(CNN):
     def add_fc_layer(self):
         self.fc_l = self.concat_l
         self.fc_l = Dense(self.hidden_unit_size)(self.fc_l)
-        self.fc_l = BatchNormalization()(self.fc_l)
+        # self.fc_l = BatchNormalization()(self.fc_l)
         self.fc_l = Activation('relu')(self.fc_l)
         self.fc_l = Dropout(self.dropout_rate)(self.fc_l)
         # self.fc_l = Dense(300)(self.fc_l)
@@ -649,5 +649,164 @@ class PCNN(CNN):
                                                                                 te_r,
                                                                                 te_f1))
 
-    def show_model_summary(self):
-        print(self.model.summary(line_length=100))
+
+class MC_PCNN(PCNN):
+    def __init__(self,
+                 max_sent_len,
+                 vocb,
+                 d1_vocb,
+                 d2_vocb,
+                 num_classes,
+                 emb_dim=100,
+                 pos_dim=10,
+                 kernel_lst=[3, 4, 5],
+                 nb_filters=100,
+                 dropout_rate=0.2,
+                 optimizer='adam',
+                 lr_rate=0.001,
+                 non_static=True,
+                 unk_limit=10000,
+                 hidden_unit_size=128):
+        self.max_sent_len = max_sent_len
+        self.vocb = vocb
+        self.d1_vocb = d1_vocb
+        self.d2_vocb = d2_vocb
+        self.emb_dim = emb_dim
+        self.pos_dim = pos_dim
+        self.kernel_lst = kernel_lst
+        self.nb_filters = nb_filters
+        self.dropout_rate = dropout_rate
+        self.optimizer = optimizer
+        self.lr_rate = lr_rate
+        self.non_static = non_static
+        self.unk_limit = unk_limit
+        self.num_classes = num_classes
+        self.hidden_unit_size = hidden_unit_size
+        self.build_model()
+
+    def add_embedding_layer(self):
+        # If static, trainable = False. If non-static, trainable = True
+        # load word matrix
+        word_matrix_lst = load_word_matrix_all(self.vocb, self.emb_dim, self.unk_limit)
+        # word_matrix = load_word_matrix(self.vocb, self.emb_dim, self.unk_limit)
+        left_emb_lst = []
+        mid_emb_lst = []
+        right_emb_lst = []
+
+        for word_matrix in word_matrix_lst:
+            # If static, trainable = False. If non-static, trainable = True
+            w_emb_left = Embedding(input_dim=len(self.vocb), output_dim=self.emb_dim, input_length=self.max_sent_len,
+                                   trainable=self.non_static, weights=[word_matrix])(self.input_sent_left)
+
+            w_emb_mid = Embedding(input_dim=len(self.vocb), output_dim=self.emb_dim, input_length=self.max_sent_len,
+                                  trainable=self.non_static, weights=[word_matrix])(self.input_sent_mid)
+
+            w_emb_right = Embedding(input_dim=len(self.vocb), output_dim=self.emb_dim, input_length=self.max_sent_len,
+                                    trainable=self.non_static, weights=[word_matrix])(self.input_sent_right)
+
+            # Position Embedding
+            # d1
+            d1_emb_left = Embedding(input_dim=len(self.d1_vocb), output_dim=self.pos_dim,
+                                    input_length=self.max_sent_len, trainable=True)(self.input_d1_left)
+            d1_emb_mid = Embedding(input_dim=len(self.d1_vocb), output_dim=self.pos_dim,
+                                   input_length=self.max_sent_len, trainable=True)(self.input_d1_mid)
+            d1_emb_right = Embedding(input_dim=len(self.d1_vocb), output_dim=self.pos_dim,
+                                     input_length=self.max_sent_len, trainable=True)(self.input_d1_right)
+            # d2
+            d2_emb_left = Embedding(input_dim=len(self.d2_vocb), output_dim=self.pos_dim,
+                                    input_length=self.max_sent_len, trainable=True)(self.input_d2_left)
+            d2_emb_mid = Embedding(input_dim=len(self.d2_vocb), output_dim=self.pos_dim,
+                                   input_length=self.max_sent_len, trainable=True)(self.input_d2_mid)
+            d2_emb_right = Embedding(input_dim=len(self.d2_vocb), output_dim=self.pos_dim,
+                                     input_length=self.max_sent_len, trainable=True)(self.input_d2_right)
+            # Concatenation
+            emb_concat_left = concatenate([w_emb_left, d1_emb_left, d2_emb_left])
+            emb_concat_mid = concatenate([w_emb_mid, d1_emb_mid, d2_emb_mid])
+            emb_concat_right = concatenate([w_emb_right, d1_emb_right, d2_emb_right])
+
+            # Reshape and append it
+            emb_concat_left = Reshape((self.max_sent_len, self.emb_dim + self.pos_dim * 2, 1))(emb_concat_left)
+            emb_concat_mid = Reshape((self.max_sent_len, self.emb_dim + self.pos_dim * 2, 1))(emb_concat_mid)
+            emb_concat_right = Reshape((self.max_sent_len, self.emb_dim + self.pos_dim * 2, 1))(emb_concat_right)
+
+            left_emb_lst.append(emb_concat_left)
+            mid_emb_lst.append(emb_concat_mid)
+            right_emb_lst.append(emb_concat_right)
+        # concat all the five embedding
+        self.emb_concat_left = concatenate(left_emb_lst)
+        self.emb_concat_mid = concatenate(mid_emb_lst)
+        self.emb_concat_right = concatenate(right_emb_lst)
+
+    def add_cnn_layer(self):
+        # CNN Parts
+        layer_lst = []
+        for kernel_size in self.kernel_lst:
+            # Sharing the filter weight
+            conv_layer = Conv2D(self.nb_filters, kernel_size=(kernel_size, self.emb_dim + self.pos_dim * 2), padding='valid')
+
+            # zero padding on embedding layer, only on height
+            padding_size = int((kernel_size-1)/2)
+            padded_emb_concat_left = ZeroPadding2D((padding_size, 0))(self.emb_concat_left)
+            padded_emb_concat_mid = ZeroPadding2D((padding_size, 0))(self.emb_concat_mid)
+            padded_emb_concat_right = ZeroPadding2D((padding_size, 0))(self.emb_concat_right)
+
+            # left, mid, right convolution
+            conv_l_left = conv_layer(padded_emb_concat_left)
+            conv_l_mid = conv_layer(padded_emb_concat_mid)
+            conv_l_right = conv_layer(padded_emb_concat_right)
+
+            # Batch normalization
+            # conv_l_left = BatchNormalization()(conv_l_left)
+            # conv_l_mid = BatchNormalization()(conv_l_mid)
+            # conv_l_right = BatchNormalization()(conv_l_right)
+
+            # Activation
+            conv_l_left = Activation('relu')(conv_l_left)
+            conv_l_mid = Activation('relu')(conv_l_mid)
+            conv_l_right = Activation('relu')(conv_l_right)
+
+            # Maxpool
+            conv_l_left = GlobalMaxPool2D()(conv_l_left)
+            conv_l_mid = GlobalMaxPool2D()(conv_l_mid)
+            conv_l_right = GlobalMaxPool2D()(conv_l_right)
+
+            # Dropout
+            conv_l_left = Dropout(self.dropout_rate)(conv_l_left)
+            conv_l_mid = Dropout(self.dropout_rate)(conv_l_mid)
+            conv_l_right = Dropout(self.dropout_rate)(conv_l_right)
+
+            # Concat
+            layer_lst.append(concatenate([conv_l_left, conv_l_mid, conv_l_right]))
+
+        if len(layer_lst) != 1:
+            self.concat_l = concatenate(layer_lst)
+        else:
+            self.concat_l = layer_lst[0]
+
+    def add_fc_layer(self):
+        self.fc_l = self.concat_l
+        self.fc_l = Dense(self.hidden_unit_size)(self.fc_l)
+        # self.fc_l = BatchNormalization()(self.fc_l)
+        self.fc_l = Activation('relu')(self.fc_l)
+        self.fc_l = Dropout(self.dropout_rate)(self.fc_l)
+        self.pred_output = Dense(self.num_classes)(self.fc_l)
+        self.pred_output = Activation('softmax')(self.pred_output)
+
+    def write_hyperparam(self, nb_epoch, batch_size):
+        # mode: cnn | nb_epoch: 30 | batch: 200 | opt: adam | lr: 0.007 | pretrain: True | k_lst: [3, 4, 5] | nb_filters: 100 |
+        # emb_dim: 200 | pos_dim: 10 | sent_len: 150 | dropout: 0.8
+        # Write k_lst
+        k_lst_str = "["
+        for kernel in self.kernel_lst:
+            k_lst_str += "{} ".format(kernel)
+        k_lst_str = k_lst_str.rstrip()
+        k_lst_str += "]"
+        log_str_1 = "mode: {} | nb_epoch: {} | batch: {} | opt: {} | lr: {} | hidden_unit_size: {}".format(type(self).__name__,
+                                                                                                           nb_epoch, batch_size,
+                                                                                                           self.optimizer,
+                                                                                                           self.lr_rate,
+                                                                                                           self.hidden_unit_size)
+        log_str_2 = "k_lst: {} | nb_filters: {} | emb_dim: {} | pos_dim: {} | sent_len: {} | dropout: {}".format(k_lst_str, self.nb_filters,
+                                                                                                                 self.emb_dim, self.pos_dim,
+                                                                                                                 self.max_sent_len, self.dropout_rate)
+        return log_str_1, log_str_2

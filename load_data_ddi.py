@@ -13,6 +13,14 @@ train_filename = 'train.tsv'
 test_filename = 'test.tsv'
 vocab_filename = 'vocab'
 
+word_vec_file_lst = [
+    'pmc',
+    'pubmed',
+    'pubmed_and_pmc',
+    'pubmed_myself',
+    'wiki_pubmed'
+]
+
 # Check whether the data file exists
 if not os.path.exists(os.path.join(data_dir, train_filename)):
     raise FileNotFoundError("[{}] file not found".format(train_filename))
@@ -195,13 +203,6 @@ def load_word_matrix(vocb, emb_dim, unk_limit):
     vec_file_name = os.path.join(word2vec_dir, file_name)
     if not os.path.exists(vec_file_name):
         raise FileNotFoundError(vec_file_name + ' not found')
-    # with open(vec_file_name, 'r', encoding='utf-8') as f:
-    #     for line in f:
-    #         line = line.rstrip()
-    #         values = line.split()
-    #         word = values[0]
-    #         coefs = np.asarray(values[1:], dtype='float32')
-    #         embedding_index[word] = coefs
     model = KeyedVectors.load_word2vec_format(vec_file_name, binary=True)
     if len(vocb) < unk_limit:
         word_matrix = np.zeros((len(vocb), emb_dim))
@@ -231,6 +232,57 @@ def load_word_matrix(vocb, emb_dim, unk_limit):
             '''
     print('{} words not in word vector'.format(cnt))
     return word_matrix
+
+def load_word_matrix_from_txt(vocb, emb_dim, unk_limit, word_matrix_file_name):
+    print("Loading word2vec {}...".format(word_matrix_file_name))
+    # load word2vec by gensim library
+    # Dimension is 200
+    vec_file_name = os.path.join(word2vec_dir, word_matrix_file_name)
+    if not os.path.exists(vec_file_name):
+        raise FileNotFoundError(vec_file_name + ' not found')
+    model = dict()
+    with open(vec_file_name, 'r', encoding='utf-8') as f:
+        for line in f:
+            line = line.rstrip()
+            values = line.split()
+            word = values[0].lower()  # make it lowercase
+            coefs = np.asarray(values[1:], dtype='float32')
+            model[word] = coefs
+    # model = KeyedVectors.load_word2vec_format(vec_file_name, binary=True)
+    if len(vocb) < unk_limit:
+        word_matrix = np.zeros((len(vocb), emb_dim))
+    else:
+        word_matrix = np.zeros((unk_limit, emb_dim))
+    print('word_matrix.shape:', word_matrix.shape)
+    cnt = 0
+    for word, i in vocb.items():
+        if i < unk_limit:
+            try:
+                if word == 'druga' or word == 'drugb' or word == 'drugn':
+                    vector = model['drug']
+                else:
+                    vector = model[word]
+                word_matrix[i] = np.asarray(vector)
+            except:
+                # word2vec에 없는 단어일 시
+                word_matrix[i] = np.random.uniform(-0.1, 0.1, emb_dim)
+                cnt += 1
+            '''
+            embedding_vector = embedding_index.get(word)
+            if embedding_vector is not None:
+                word_matrix[i] = embedding_vector
+            else:
+                word_matrix[i] = np.random.uniform(-1.0, 1.0, emb_dim)
+                cnt += 1
+            '''
+    print('{} words not in word vector'.format(cnt))
+    return word_matrix
+
+def load_word_matrix_all(vocb, emb_dim, unk_limit):
+    word_matrix_lst = []
+    for w2v_filename in word_vec_file_lst:
+        word_matrix_lst.append(load_word_matrix_from_txt(vocb, emb_dim, unk_limit, w2v_filename))
+    return word_matrix_lst
 
 
 def pad_sequence(seq, max_sent_len):

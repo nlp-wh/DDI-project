@@ -1,16 +1,16 @@
 from load_data_ddi import load_data, sentence_split_for_pcnn
-from model import CNN, MCCNN, BILSTM, PCNN
+from model import CNN, MCCNN, BILSTM, PCNN, MC_PCNN
 
 ########### Hyperparameter ###########
 # 1. Training settings
-train_mode = 'pcnn'
+train_mode = 'mcpcnn'
 nb_epoch = 100
 batch_size = 64
-learning_rate = 0.001
+learning_rate = 0.0007
 optimizer = 'adam'
 use_pretrained = True  # If you're using pretrained, emb_dim will be 200 for PubMed-and-PMC-w2v.bin (http://evexdb.org/pmresources/vec-space-models/)
 dev_size = 0.1
-hidden_unit_size = 256
+hidden_unit_size = 256 * 2
 
 # 2. CNN specific
 kernel_lst = [3, 5, 7]
@@ -38,7 +38,7 @@ if __name__ == '__main__':
         (te_sentences2idx, te_d1_pos_lst, te_d2_pos_lst, te_pos_tuple_lst, te_y), \
         (vocb, vocb_inv), (d1_vocb, d2_vocb) = load_data(unk_limit=unk_limit, max_sent_len=max_sent_len, dev_size=dev_size)
 
-    if train_mode.lower() == 'pcnn':
+    if train_mode.lower() == 'pcnn' or train_mode.lower() == 'mcpcnn':
         (tr_sent_left, tr_d1_left, tr_d2_left), (tr_sent_mid, tr_d1_mid, tr_d2_mid), (tr_sent_right, tr_d1_right, tr_d2_right) = \
             sentence_split_for_pcnn(sentences2idx=tr_sentences2idx, d1_pos_lst=tr_d1_pos_lst, d2_pos_lst=tr_d1_pos_lst,
                                     pos_tuple_lst=tr_pos_tuple_lst, max_sent_len=max_sent_len)
@@ -57,22 +57,39 @@ if __name__ == '__main__':
 
         del te_sentences2idx, te_d1_pos_lst, te_d2_pos_lst, te_pos_tuple_lst
 
-        model = PCNN(max_sent_len=max_sent_len,
-                     vocb=vocb,
-                     d1_vocb=d1_vocb,
-                     d2_vocb=d2_vocb,
-                     emb_dim=emb_dim,
-                     pos_dim=pos_dim,
-                     kernel_lst=kernel_lst,
-                     nb_filters=nb_filters,
-                     dropout_rate=dropout_rate,
-                     optimizer=optimizer,
-                     non_static=True,
-                     lr_rate=learning_rate,
-                     use_pretrained=use_pretrained,
-                     unk_limit=unk_limit,
-                     num_classes=num_classes,
-                     hidden_unit_size=hidden_unit_size)
+        if train_mode.lower() == 'pcnn':
+            model = PCNN(max_sent_len=max_sent_len,
+                         vocb=vocb,
+                         d1_vocb=d1_vocb,
+                         d2_vocb=d2_vocb,
+                         emb_dim=emb_dim,
+                         pos_dim=pos_dim,
+                         kernel_lst=kernel_lst,
+                         nb_filters=nb_filters,
+                         dropout_rate=dropout_rate,
+                         optimizer=optimizer,
+                         non_static=True,
+                         lr_rate=learning_rate,
+                         use_pretrained=use_pretrained,
+                         unk_limit=unk_limit,
+                         num_classes=num_classes,
+                         hidden_unit_size=hidden_unit_size)
+        else:
+            model = MC_PCNN(max_sent_len=max_sent_len,
+                        vocb=vocb,
+                        d1_vocb=d1_vocb,
+                        d2_vocb=d2_vocb,
+                        emb_dim=emb_dim,
+                        pos_dim=pos_dim,
+                        kernel_lst=kernel_lst,
+                        nb_filters=nb_filters,
+                        dropout_rate=dropout_rate,
+                        optimizer=optimizer,
+                        non_static=True,
+                        lr_rate=learning_rate,
+                        unk_limit=unk_limit,
+                        num_classes=num_classes,
+                        hidden_unit_size=hidden_unit_size)
 
         model.show_model_summary()
         model.save_model()
