@@ -8,9 +8,9 @@ from keras.optimizers import Adam, Adadelta, RMSprop, Adagrad
 from sklearn.metrics import f1_score, recall_score, precision_score
 
 # AutoML library
-from hyperopt import Trials, STATUS_OK, tpe
-from hyperas import optim
-from hyperas.distributions import uniform, choice
+# from hyperopt import Trials, STATUS_OK, tpe
+# from hyperas import optim
+# from hyperas.distributions import uniform, choice
 
 import os
 import sys
@@ -173,8 +173,12 @@ class CNN(object):
             k_lst_str += "{} ".format(kernel)
         k_lst_str = k_lst_str.rstrip()
         k_lst_str += "]"
-        log_str_1 = "mode: {} | nb_epoch: {} | batch: {} | opt: {} | lr: {} | pretrain: {} | hidden_unit_size: {}".format(type(self).__name__, nb_epoch, batch_size,
-                                                                                                                          self.optimizer, self.lr_rate, self.use_pretrained, self.hidden_unit_size)
+        log_str_1 = "mode: {} | nb_epoch: {} | batch: {} | opt: {} | lr: {} | pretrain: {} | hidden_unit_size: {}".format(type(self).__name__,
+                                                                                                                          nb_epoch, batch_size,
+                                                                                                                          self.optimizer,
+                                                                                                                          self.lr_rate,
+                                                                                                                          self.use_pretrained,
+                                                                                                                          self.hidden_unit_size)
         log_str_2 = "k_lst: {} | nb_filters: {} | emb_dim: {} | pos_dim: {} | sent_len: {} | dropout: {}".format(k_lst_str, self.nb_filters,
                                                                                                                  self.emb_dim, self.pos_dim,
                                                                                                                  self.max_sent_len, self.dropout_rate)
@@ -283,8 +287,9 @@ class MCCNN(CNN):
                  dropout_rate=0.2,
                  optimizer='adam',
                  lr_rate=0.001,
-                 use_pretrained=False,
-                 unk_limit=10000):
+                 unk_limit=10000,
+                 hidden_unit_size=128,
+                 use_batch_norm=False):
         self.max_sent_len = max_sent_len
         self.vocb = vocb
         self.d1_vocb = d1_vocb
@@ -297,55 +302,81 @@ class MCCNN(CNN):
         self.dropout_rate = dropout_rate
         self.optimizer = optimizer
         self.lr_rate = lr_rate
-        self.use_pretrained = use_pretrained
         self.unk_limit = unk_limit
+        self.hidden_unit_size = hidden_unit_size
+        self.use_batch_norm = use_batch_norm
         self.build_model()
 
     def add_embedding_layer(self):
         # If static, trainable = False. If non-static, trainable = True
-        if self.use_pretrained:
-            # load word matrix
-            word_matrix = load_word_matrix(self.vocb, self.emb_dim, self.unk_limit)
-            # If static, trainable = False. If non-static, trainable = True
-            self.w_emb_static = Embedding(input_dim=len(self.vocb), output_dim=self.emb_dim, input_length=self.max_sent_len,
-                                          trainable=False, weights=[word_matrix])(self.input_x)
-            self.w_emb_non_static = Embedding(input_dim=len(self.vocb), output_dim=self.emb_dim, input_length=self.max_sent_len,
-                                              trainable=True, weights=[word_matrix])(self.input_x)
-        else:
-            # If static, trainable = False. If non-static, trainable = True
-            self.w_emb_static = Embedding(input_dim=len(self.vocb), output_dim=self.emb_dim,
-                                          input_length=self.max_sent_len, trainable=False)(self.input_x)
-            self.w_emb_non_static = Embedding(input_dim=len(self.vocb), output_dim=self.emb_dim,
-                                              input_length=self.max_sent_len, trainable=True)(self.input_x)
-        # Position Embedding (0, 1, 2)
-        # d1
-        self.d1_emb = Embedding(input_dim=len(self.d1_vocb), output_dim=self.pos_dim, input_length=self.max_sent_len, trainable=True)(self.input_d1)
-        # d2
-        self.d2_emb = Embedding(input_dim=len(self.d2_vocb), output_dim=self.pos_dim, input_length=self.max_sent_len, trainable=True)(self.input_d2)
-        # Concatenation
-        self.w_emb_static_concat = concatenate([self.w_emb_static, self.d1_emb, self.d2_emb])
-        self.w_emb_non_static_concat = concatenate([self.w_emb_non_static, self.d1_emb, self.d2_emb])
+        # load word matrix
+        word_matrix_lst = load_word_matrix_all(self.vocb, self.emb_dim, self.unk_limit)
+        emb_lst = []
+
+        for word_matrix in word_matrix_lst:
+            w_emb = Embedding(input_dim=len(self.vocb), output_dim=self.emb_dim, input_length=self.max_sent_len,
+                              trainable=True, weights=[word_matrix])(self.input_x)
+            # Position Embedding
+            # d1
+            d1_emb = Embedding(input_dim=len(self.d1_vocb), output_dim=self.pos_dim, input_length=self.max_sent_len, trainable=True)(self.input_d1)
+            # d2
+            d2_emb = Embedding(input_dim=len(self.d2_vocb), output_dim=self.pos_dim, input_length=self.max_sent_len, trainable=True)(self.input_d2)
+            # Concatenation
+            emb_concat = concatenate([w_emb, d1_emb, d2_emb])
+            emb_concat = Reshape((self.max_sent_len, self.emb_dim + self.pos_dim * 2, 1))(emb_concat)
+            emb_lst.append(emb_concat)
+        # Concat all the embeddings
+        self.emb_concat = concatenate(emb_lst)
 
     def add_cnn_layer(self):
         # CNN Parts
         layer_lst = []
         for kernel_size in self.kernel_lst:
             # Sharing the filter weight
-            conv_layer = Conv1D(filters=self.nb_filters, kernel_size=kernel_size, padding='valid', activation='relu')
-            pool_layer = MaxPool1D(pool_size=self.max_sent_len - kernel_size + 1)
-            # Static layer
-            conv_static = conv_layer(self.w_emb_static_concat)
-            pool_static = pool_layer(conv_static)
-            # Non-static layer
-            conv_non_static = conv_layer(self.w_emb_non_static_concat)
-            pool_non_static = pool_layer(conv_non_static)
-            # Add two layer
-            add_l = add([pool_static, pool_non_static])
-            drop_l = Dropout(self.dropout_rate)(add_l)
-            # Append the final result
-            layer_lst.append(drop_l)
+            conv_layer = Conv2D(self.nb_filters, kernel_size=(kernel_size, self.emb_dim + self.pos_dim * 2), padding='valid')
+            # zero padding on embedding layer, only on height
+            if kernel_size % 2 == 0:
+                padding_size = int(kernel_size / 2)
+            else:
+                padding_size = int((kernel_size - 1) / 2)
+            padded_emb_concat = ZeroPadding2D((padding_size, 0))(self.emb_concat)
 
-        self.concat_l = concatenate(layer_lst)
+            # Convolution
+            conv_l = conv_layer(padded_emb_concat)
+            # Batch Normalization
+            if self.use_batch_norm:
+                conv_l = BatchNormalization()(conv_l)
+            # Activation
+            conv_l = Activation('relu')(conv_l)
+            # Maxpool
+            conv_l = GlobalMaxPool2D()(conv_l)
+            # Dropout
+            conv_l = Dropout(self.dropout_rate)(conv_l)
+            # Append the final result
+            layer_lst.append(conv_l)
+        if len(layer_lst) != 1:
+            self.concat_l = concatenate(layer_lst)
+        else:
+            self.concat_l = layer_lst[0]
+
+    def write_hyperparam(self, nb_epoch, batch_size):
+        # mode: cnn | nb_epoch: 30 | batch: 200 | opt: adam | lr: 0.007 | k_lst: [3, 4, 5] | nb_filters: 100 |
+        # emb_dim: 200 | pos_dim: 10 | sent_len: 150 | dropout: 0.8
+        # Write k_lst
+        k_lst_str = "["
+        for kernel in self.kernel_lst:
+            k_lst_str += "{} ".format(kernel)
+        k_lst_str = k_lst_str.rstrip()
+        k_lst_str += "]"
+        log_str_1 = "mode: {} | nb_epoch: {} | batch: {} | opt: {} | lr: {} | hidden_unit_size: {}".format(type(self).__name__,
+                                                                                                           nb_epoch, batch_size,
+                                                                                                           self.optimizer,
+                                                                                                           self.lr_rate,
+                                                                                                           self.hidden_unit_size)
+        log_str_2 = "k_lst: {} | nb_filters: {} | emb_dim: {} | pos_dim: {} | sent_len: {} | dropout: {}".format(k_lst_str, self.nb_filters,
+                                                                                                                 self.emb_dim, self.pos_dim,
+                                                                                                                 self.max_sent_len, self.dropout_rate)
+        return log_str_1, log_str_2
 
 
 class BILSTM(CNN):
@@ -753,9 +784,9 @@ class MC_PCNN(PCNN):
 
             # zero padding on embedding layer, only on height
             if kernel_size % 2 == 0:
-                padding_size = int(kernel_size/2)
+                padding_size = int(kernel_size / 2)
             else:
-                padding_size = int((kernel_size-1)/2)
+                padding_size = int((kernel_size - 1) / 2)
             padded_emb_concat_left = ZeroPadding2D((padding_size, 0))(self.emb_concat_left)
             padded_emb_concat_mid = ZeroPadding2D((padding_size, 0))(self.emb_concat_mid)
             padded_emb_concat_right = ZeroPadding2D((padding_size, 0))(self.emb_concat_right)

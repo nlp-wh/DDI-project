@@ -3,7 +3,7 @@ from model import CNN, MCCNN, BILSTM, PCNN, MC_PCNN
 
 ########### Hyperparameter ###########
 # 1. Training settings
-train_mode = 'mcpcnn'
+train_mode = 'mccnn' # [cnn, pcnn, mccnn, mcpcnn, rnn]
 nb_epoch = 100
 batch_size = 128
 learning_rate = 0.0005
@@ -35,9 +35,9 @@ use_self_att = False
 
 if __name__ == '__main__':
     (tr_sentences2idx, tr_d1_pos_lst, tr_d2_pos_lst, tr_pos_tuple_lst, tr_y), \
-        (de_sentences2idx, de_d1_pos_lst, de_d2_pos_lst, de_pos_tuple_lst, de_y), \
-        (te_sentences2idx, te_d1_pos_lst, te_d2_pos_lst, te_pos_tuple_lst, te_y), \
-        (vocb, vocb_inv), (d1_vocb, d2_vocb) = load_data(unk_limit=unk_limit, max_sent_len=max_sent_len, dev_size=dev_size)
+    (de_sentences2idx, de_d1_pos_lst, de_d2_pos_lst, de_pos_tuple_lst, de_y), \
+    (te_sentences2idx, te_d1_pos_lst, te_d2_pos_lst, te_pos_tuple_lst, te_y), \
+    (vocb, vocb_inv), (d1_vocb, d2_vocb) = load_data(unk_limit=unk_limit, max_sent_len=max_sent_len, dev_size=dev_size)
 
     if train_mode.lower() == 'pcnn' or train_mode.lower() == 'mcpcnn':
         (tr_sent_left, tr_d1_left, tr_d2_left), (tr_sent_mid, tr_d1_mid, tr_d2_mid), (tr_sent_right, tr_d1_right, tr_d2_right) = \
@@ -98,7 +98,8 @@ if __name__ == '__main__':
         model.save_model()
         model.train(nb_epoch=nb_epoch, batch_size=batch_size, train_data=(
             (tr_sent_left, tr_d1_left, tr_d2_left), (tr_sent_mid, tr_d1_mid, tr_d2_mid), (tr_sent_right, tr_d1_right, tr_d2_right), tr_y),
-            dev_data=((de_sent_left, de_d1_left, de_d2_left), (de_sent_mid, de_d1_mid, de_d2_mid), (de_sent_right, de_d1_right, de_d2_right), de_y))
+                    dev_data=(
+                    (de_sent_left, de_d1_left, de_d2_left), (de_sent_mid, de_d1_mid, de_d2_mid), (de_sent_right, de_d1_right, de_d2_right), de_y))
         model.evaluate(
             test_data=((te_sent_left, te_d1_left, te_d2_left), (te_sent_mid, te_d1_mid, te_d2_mid), (te_sent_right, te_d1_right, te_d2_right), te_y),
             batch_size=batch_size)
@@ -119,7 +120,8 @@ if __name__ == '__main__':
                         use_pretrained=use_pretrained,
                         unk_limit=unk_limit,
                         num_classes=num_classes,
-                        hidden_unit_size=hidden_unit_size)
+                        hidden_unit_size=hidden_unit_size,
+                        use_batch_norm=use_batch_norm)
 
         elif train_mode.lower() == 'mccnn':
             model = MCCNN(max_sent_len=max_sent_len,
@@ -133,7 +135,6 @@ if __name__ == '__main__':
                           dropout_rate=dropout_rate,
                           optimizer=optimizer,
                           lr_rate=learning_rate,
-                          use_pretrained=use_pretrained,
                           unk_limit=unk_limit,
                           num_classes=num_classes,
                           use_batch_norm=use_batch_norm)
