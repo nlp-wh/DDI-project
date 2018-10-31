@@ -36,7 +36,7 @@ callback_list = [
     # 2. Model Checkpoint
     ModelCheckpoint(filepath=os.path.join(result_dir, 'weights.h5'), monitor='val_loss', save_best_only=True),
     # 3. Reducing Learning rate automatically
-    ReduceLROnPlateau(monitor='val_loss', patience=3, factor=0.5),  # Reduce the lr_rate into 10%
+    ReduceLROnPlateau(monitor='val_loss', patience=2, factor=0.8),  # Reduce the lr_rate into 10%
     # 4. Tensorboard callback
     # TensorBoard(log_dir=tf_board_dir, histogram_freq=0, write_graph=True, write_grads=True, write_images=True)
 ]
@@ -93,16 +93,22 @@ class CNN(object):
         self.input_d2 = Input(shape=(self.max_sent_len,), dtype='int32')
 
     def add_embedding_layer(self):
+        if self.unk_limit < len(self.vocb):
+            input_dim_len = self.unk_limit
+        else:
+            input_dim_len = len(self.vocb)
+
         # If static, trainable = False. If non-static, trainable = True
         if self.use_pretrained:
             # load word matrix
             word_matrix = load_word_matrix(self.vocb, self.emb_dim, self.unk_limit)
             # If static, trainable = False. If non-static, trainable = True
-            self.w_emb = Embedding(input_dim=len(self.vocb), output_dim=self.emb_dim, input_length=self.max_sent_len,
+            self.w_emb = Embedding(input_dim=input_dim_len, output_dim=self.emb_dim, input_length=self.max_sent_len,
                                    trainable=self.non_static, weights=[word_matrix])(self.input_x)
         else:
             # If static, trainable = False. If non-static, trainable = True
-            self.w_emb = Embedding(input_dim=len(self.vocb), output_dim=self.emb_dim,
+            
+            self.w_emb = Embedding(input_dim=input_dim_len, output_dim=self.emb_dim,
                                    input_length=self.max_sent_len, trainable=self.non_static)(self.input_x)
 
         # Position Embedding
@@ -313,15 +319,15 @@ class MCCNN(CNN):
         # load word matrix
         word_matrix_lst = load_word_matrix_all(self.vocb, self.emb_dim, self.unk_limit)
         emb_lst = []
+        # Position Embedding
+        # d1
+        d1_emb = Embedding(input_dim=len(self.d1_vocb), output_dim=self.pos_dim, input_length=self.max_sent_len, trainable=True)(self.input_d1)
+        # d2
+        d2_emb = Embedding(input_dim=len(self.d2_vocb), output_dim=self.pos_dim, input_length=self.max_sent_len, trainable=True)(self.input_d2)
 
         for word_matrix in word_matrix_lst:
-            w_emb = Embedding(input_dim=len(self.vocb), output_dim=self.emb_dim, input_length=self.max_sent_len,
+            w_emb = Embedding(input_dim=len(word_matrix), output_dim=self.emb_dim, input_length=self.max_sent_len,
                               trainable=True, weights=[word_matrix])(self.input_x)
-            # Position Embedding
-            # d1
-            d1_emb = Embedding(input_dim=len(self.d1_vocb), output_dim=self.pos_dim, input_length=self.max_sent_len, trainable=True)(self.input_d1)
-            # d2
-            d2_emb = Embedding(input_dim=len(self.d2_vocb), output_dim=self.pos_dim, input_length=self.max_sent_len, trainable=True)(self.input_d2)
             # Concatenation
             emb_concat = concatenate([w_emb, d1_emb, d2_emb])
             emb_concat = Reshape((self.max_sent_len, self.emb_dim + self.pos_dim * 2, 1))(emb_concat)
@@ -511,27 +517,32 @@ class PCNN(CNN):
 
     def add_embedding_layer(self):
         # If static, trainable = False. If non-static, trainable = True
+        if self.unk_limit < len(self.vocb):
+            input_dim_len = self.unk_limit
+        else:
+            input_dim_len = len(self.vocb)
+
         if self.use_pretrained:
             # load word matrix
             word_matrix = load_word_matrix(self.vocb, self.emb_dim, self.unk_limit)
             # If static, trainable = False. If non-static, trainable = True
-            self.w_emb_left = Embedding(input_dim=len(self.vocb), output_dim=self.emb_dim, input_length=self.max_sent_len,
+            self.w_emb_left = Embedding(input_dim=input_dim_len, output_dim=self.emb_dim, input_length=self.max_sent_len,
                                         trainable=self.non_static, weights=[word_matrix])(self.input_sent_left)
 
-            self.w_emb_mid = Embedding(input_dim=len(self.vocb), output_dim=self.emb_dim, input_length=self.max_sent_len,
+            self.w_emb_mid = Embedding(input_dim=input_dim_len, output_dim=self.emb_dim, input_length=self.max_sent_len,
                                        trainable=self.non_static, weights=[word_matrix])(self.input_sent_mid)
 
-            self.w_emb_right = Embedding(input_dim=len(self.vocb), output_dim=self.emb_dim, input_length=self.max_sent_len,
+            self.w_emb_right = Embedding(input_dim=input_dim_len, output_dim=self.emb_dim, input_length=self.max_sent_len,
                                          trainable=self.non_static, weights=[word_matrix])(self.input_sent_right)
         else:
             # If static, trainable = False. If non-static, trainable = True
-            self.w_emb_left = Embedding(input_dim=len(self.vocb), output_dim=self.emb_dim,
+            self.w_emb_left = Embedding(input_dim=input_dim_len, output_dim=self.emb_dim,
                                         input_length=self.max_sent_len, trainable=self.non_static)(self.input_sent_left)
 
-            self.w_emb_mid = Embedding(input_dim=len(self.vocb), output_dim=self.emb_dim,
+            self.w_emb_mid = Embedding(input_dim=input_dim_len, output_dim=self.emb_dim,
                                        input_length=self.max_sent_len, trainable=self.non_static)(self.input_sent_mid)
 
-            self.w_emb_right = Embedding(input_dim=len(self.vocb), output_dim=self.emb_dim,
+            self.w_emb_right = Embedding(input_dim=input_dim_len, output_dim=self.emb_dim,
                                          input_length=self.max_sent_len, trainable=self.non_static)(self.input_sent_right)
 
         # Position Embedding
@@ -731,33 +742,33 @@ class MC_PCNN(PCNN):
         left_emb_lst = []
         mid_emb_lst = []
         right_emb_lst = []
+        # Position Embedding
+        # d1
+        d1_emb_left = Embedding(input_dim=len(self.d1_vocb), output_dim=self.pos_dim,
+                                input_length=self.max_sent_len, trainable=True)(self.input_d1_left)
+        d1_emb_mid = Embedding(input_dim=len(self.d1_vocb), output_dim=self.pos_dim,
+                               input_length=self.max_sent_len, trainable=True)(self.input_d1_mid)
+        d1_emb_right = Embedding(input_dim=len(self.d1_vocb), output_dim=self.pos_dim,
+                                 input_length=self.max_sent_len, trainable=True)(self.input_d1_right)
+        # d2
+        d2_emb_left = Embedding(input_dim=len(self.d2_vocb), output_dim=self.pos_dim,
+                                input_length=self.max_sent_len, trainable=True)(self.input_d2_left)
+        d2_emb_mid = Embedding(input_dim=len(self.d2_vocb), output_dim=self.pos_dim,
+                               input_length=self.max_sent_len, trainable=True)(self.input_d2_mid)
+        d2_emb_right = Embedding(input_dim=len(self.d2_vocb), output_dim=self.pos_dim,
+                                 input_length=self.max_sent_len, trainable=True)(self.input_d2_right)
 
         for word_matrix in word_matrix_lst:
             # If static, trainable = False. If non-static, trainable = True
-            w_emb_left = Embedding(input_dim=len(self.vocb), output_dim=self.emb_dim, input_length=self.max_sent_len,
+            w_emb_left = Embedding(input_dim=len(word_matrix), output_dim=self.emb_dim, input_length=self.max_sent_len,
                                    trainable=self.non_static, weights=[word_matrix])(self.input_sent_left)
 
-            w_emb_mid = Embedding(input_dim=len(self.vocb), output_dim=self.emb_dim, input_length=self.max_sent_len,
+            w_emb_mid = Embedding(input_dim=len(word_matrix), output_dim=self.emb_dim, input_length=self.max_sent_len,
                                   trainable=self.non_static, weights=[word_matrix])(self.input_sent_mid)
 
-            w_emb_right = Embedding(input_dim=len(self.vocb), output_dim=self.emb_dim, input_length=self.max_sent_len,
+            w_emb_right = Embedding(input_dim=len(word_matrix), output_dim=self.emb_dim, input_length=self.max_sent_len,
                                     trainable=self.non_static, weights=[word_matrix])(self.input_sent_right)
 
-            # Position Embedding
-            # d1
-            d1_emb_left = Embedding(input_dim=len(self.d1_vocb), output_dim=self.pos_dim,
-                                    input_length=self.max_sent_len, trainable=True)(self.input_d1_left)
-            d1_emb_mid = Embedding(input_dim=len(self.d1_vocb), output_dim=self.pos_dim,
-                                   input_length=self.max_sent_len, trainable=True)(self.input_d1_mid)
-            d1_emb_right = Embedding(input_dim=len(self.d1_vocb), output_dim=self.pos_dim,
-                                     input_length=self.max_sent_len, trainable=True)(self.input_d1_right)
-            # d2
-            d2_emb_left = Embedding(input_dim=len(self.d2_vocb), output_dim=self.pos_dim,
-                                    input_length=self.max_sent_len, trainable=True)(self.input_d2_left)
-            d2_emb_mid = Embedding(input_dim=len(self.d2_vocb), output_dim=self.pos_dim,
-                                   input_length=self.max_sent_len, trainable=True)(self.input_d2_mid)
-            d2_emb_right = Embedding(input_dim=len(self.d2_vocb), output_dim=self.pos_dim,
-                                     input_length=self.max_sent_len, trainable=True)(self.input_d2_right)
             # Concatenation
             emb_concat_left = concatenate([w_emb_left, d1_emb_left, d2_emb_left])
             emb_concat_mid = concatenate([w_emb_mid, d1_emb_mid, d2_emb_mid])
