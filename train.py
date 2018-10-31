@@ -3,14 +3,14 @@ from model import CNN, MCCNN, BILSTM, PCNN, MC_PCNN
 
 ########### Hyperparameter ###########
 # 1. Training settings
-train_mode = 'mccnn' # [cnn, pcnn, mccnn, mcpcnn, rnn]
+train_mode = 'mcpcnn' # [cnn, pcnn, mccnn, mcpcnn, rnn]
 nb_epoch = 100
 batch_size = 128
 learning_rate = 0.0005
 optimizer = 'adam'
 use_pretrained = True  # If you're using pretrained, emb_dim will be 200 for PubMed-and-PMC-w2v.bin (http://evexdb.org/pmresources/vec-space-models/)
 dev_size = 0.1
-hidden_unit_size = 256 * 2
+hidden_unit_size = 256
 use_batch_norm = False
 
 # 2. CNN specific
@@ -137,6 +137,7 @@ if __name__ == '__main__':
                           lr_rate=learning_rate,
                           unk_limit=unk_limit,
                           num_classes=num_classes,
+                          hidden_unit_size=hidden_unit_size,
                           use_batch_norm=use_batch_norm)
 
         elif train_mode.lower() == 'rnn':

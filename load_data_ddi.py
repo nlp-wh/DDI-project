@@ -16,8 +16,8 @@ vocab_filename = 'vocab'
 word_vec_file_lst = [
     'pmc',
     'pubmed',
-    'pubmed_and_pmc',
-    'pubmed_myself',
+    # 'pubmed_and_pmc',
+    # 'pubmed_myself',
     'wiki_pubmed'
 ]
 

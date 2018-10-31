@@ -1,4 +1,6 @@
 import subprocess
 
-for i in range(7):
+repetition = 5
+
+for i in range(repetition):
     subprocess.call(['python', 'train.py'])
