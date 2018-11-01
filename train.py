@@ -10,8 +10,13 @@ learning_rate = 0.0005
 optimizer = 'adam'
 use_pretrained = True  # If you're using pretrained, emb_dim will be 200 for PubMed-and-PMC-w2v.bin (http://evexdb.org/pmresources/vec-space-models/)
 dev_size = 0.1
-hidden_unit_size = 500
+hidden_unit_size = 256
 use_batch_norm = False
+
+# l2 regularizer setting
+use_l2_reg = True
+reg_coef_conv = 0.0001
+reg_coef_dense = 0.0001
 
 # 2. CNN specific
 kernel_lst = [6, 7, 8, 9]  # [3, 5, 7]
@@ -22,11 +27,11 @@ rnn_dim = 200  # Dimension for output of LSTM
 
 # 4. Model common settings
 emb_dim = 200
-pos_dim = 20
+pos_dim = 10
 max_sent_len = 150
 num_classes = 5
-unk_limit = 4000
-dropout_rate = 0.3
+unk_limit = 5000
+dropout_rate = 0.5
 
 # 5. Self attention
 use_self_att = False
@@ -92,7 +97,10 @@ if __name__ == '__main__':
                             unk_limit=unk_limit,
                             num_classes=num_classes,
                             hidden_unit_size=hidden_unit_size,
-                            use_batch_norm=use_batch_norm)
+                            use_batch_norm=use_batch_norm,
+                            use_l2_reg=use_l2_reg,
+                            reg_coef_conv=reg_coef_conv,
+                            reg_coef_dense=reg_coef_dense)
 
         model.show_model_summary()
         model.save_model()

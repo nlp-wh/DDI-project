@@ -32,35 +32,20 @@ if not os.path.exists(tf_board_dir):
 # CallBack setting
 callback_list = [
     # 1. Early Stopping Callback
-    EarlyStopping(monitor='val_loss', patience=5),
+    EarlyStopping(monitor='val_acc', patience=5),
     # 2. Model Checkpoint
-    ModelCheckpoint(filepath=os.path.join(result_dir, 'weights.h5'), monitor='val_loss', save_best_only=True),
+    ModelCheckpoint(filepath=os.path.join(result_dir, 'weights.h5'), monitor='val_acc', save_best_only=True),
     # 3. Reducing Learning rate automatically
-    ReduceLROnPlateau(monitor='val_loss', patience=2, factor=0.8),  # Reduce the lr_rate into 10%
+    ReduceLROnPlateau(monitor='val_acc', patience=2, factor=0.1),  # Reduce the lr_rate into 10%
     # 4. Tensorboard callback
     # TensorBoard(log_dir=tf_board_dir, histogram_freq=0, write_graph=True, write_grads=True, write_images=True)
 ]
 
 
 class CNN(object):
-    def __init__(self,
-                 max_sent_len,
-                 vocb,
-                 d1_vocb,
-                 d2_vocb,
-                 num_classes,
-                 emb_dim=100,
-                 pos_dim=10,
-                 kernel_lst=[3, 4, 5],
-                 nb_filters=100,
-                 dropout_rate=0.2,
-                 optimizer='adam',
-                 lr_rate=0.001,
-                 non_static=True,
-                 use_pretrained=False,
-                 unk_limit=10000,
-                 hidden_unit_size=128,
-                 use_batch_norm=False):
+    def __init__(self, max_sent_len, vocb, d1_vocb, d2_vocb, num_classes, emb_dim=100, pos_dim=10, kernel_lst=[3, 4, 5], nb_filters=100,
+                 dropout_rate=0.2, optimizer='adam', lr_rate=0.001, non_static=True, use_pretrained=False, unk_limit=10000, hidden_unit_size=128,
+                 use_batch_norm=False, use_l2_reg=False, reg_coef_conv=0.001, reg_coef_dense=0.001):
         self.max_sent_len = max_sent_len
         self.vocb = vocb
         self.d1_vocb = d1_vocb
@@ -78,6 +63,9 @@ class CNN(object):
         self.num_classes = num_classes
         self.hidden_unit_size = hidden_unit_size
         self.use_batch_norm = use_batch_norm
+        self.use_l2_reg = use_l2_reg
+        self.reg_coef_conv = reg_coef_conv
+        self.reg_coef_dense = reg_coef_dense
         self.build_model()
 
     def build_model(self):
@@ -107,7 +95,7 @@ class CNN(object):
                                    trainable=self.non_static, weights=[word_matrix])(self.input_x)
         else:
             # If static, trainable = False. If non-static, trainable = True
-            
+
             self.w_emb = Embedding(input_dim=input_dim_len, output_dim=self.emb_dim,
                                    input_length=self.max_sent_len, trainable=self.non_static)(self.input_x)
 
@@ -123,7 +111,11 @@ class CNN(object):
         # CNN Parts
         layer_lst = []
         for kernel_size in self.kernel_lst:
-            conv_l = Conv1D(filters=self.nb_filters, kernel_size=kernel_size, padding='valid')(self.emb_concat)
+            if self.use_l2_reg:
+                conv_l = Conv1D(filters=self.nb_filters, kernel_size=kernel_size, padding='valid', kernel_regularizer=l2(self.reg_coef_conv))(
+                    self.emb_concat)
+            else:
+                conv_l = Conv1D(filters=self.nb_filters, kernel_size=kernel_size, padding='valid')(self.emb_concat)
             if self.use_batch_norm:
                 conv_l = BatchNormalization()(conv_l)
             conv_l = Activation('relu')(conv_l)
@@ -139,12 +131,18 @@ class CNN(object):
 
     def add_fc_layer(self):
         self.fc_l = self.concat_l
-        self.fc_l = Dense(self.hidden_unit_size)(self.fc_l)
+        if self.use_l2_reg:
+            self.fc_l = Dense(self.hidden_unit_size, kernel_regularizer=l2(self.reg_coef_dense))(self.fc_l)
+        else:
+            self.fc_l = Dense(self.hidden_unit_size)(self.fc_l)
         if self.use_batch_norm:
             self.fc_l = BatchNormalization()(self.fc_l)
         self.fc_l = Activation('relu')(self.fc_l)
         self.fc_l = Dropout(self.dropout_rate)(self.fc_l)
-        self.pred_output = Dense(self.num_classes, activation='softmax')(self.fc_l)
+        if self.use_l2_reg:
+            self.pred_output = Dense(self.num_classes, activation='softmax', kernel_regularizer=l2(self.reg_coef_dense))(self.fc_l)
+        else:
+            self.pred_output = Dense(self.num_classes, activation='softmax')(self.fc_l)
 
     def compile_model(self):
         self.model = Model(inputs=[self.input_x, self.input_d1, self.input_d2], outputs=self.pred_output)
@@ -281,22 +279,9 @@ class CNN(object):
 
 
 class MCCNN(CNN):
-    def __init__(self,
-                 max_sent_len,
-                 vocb,
-                 d1_vocb,
-                 d2_vocb,
-                 num_classes,
-                 emb_dim=100,
-                 pos_dim=10,
-                 kernel_lst=[3, 4, 5],
-                 nb_filters=100,
-                 dropout_rate=0.2,
-                 optimizer='adam',
-                 lr_rate=0.001,
-                 unk_limit=10000,
-                 hidden_unit_size=128,
-                 use_batch_norm=False):
+    def __init__(self, max_sent_len, vocb, d1_vocb, d2_vocb, num_classes, emb_dim=100, pos_dim=10, kernel_lst=[3, 4, 5], nb_filters=100,
+                 dropout_rate=0.2, optimizer='adam', lr_rate=0.001, unk_limit=10000, hidden_unit_size=128, use_batch_norm=False, use_l2_reg=False,
+                 reg_coef_conv=0.001, reg_coef_dense=0.001):
         self.max_sent_len = max_sent_len
         self.vocb = vocb
         self.d1_vocb = d1_vocb
@@ -312,6 +297,9 @@ class MCCNN(CNN):
         self.unk_limit = unk_limit
         self.hidden_unit_size = hidden_unit_size
         self.use_batch_norm = use_batch_norm
+        self.use_l2_reg = use_l2_reg
+        self.reg_coef_conv = reg_coef_conv
+        self.reg_coef_dense = reg_coef_dense
         self.build_model()
 
     def add_embedding_layer(self):
@@ -340,7 +328,11 @@ class MCCNN(CNN):
         layer_lst = []
         for kernel_size in self.kernel_lst:
             # Sharing the filter weight
-            conv_layer = Conv2D(self.nb_filters, kernel_size=(kernel_size, self.emb_dim + self.pos_dim * 2), padding='valid')
+            if self.use_l2_reg:
+                conv_layer = Conv2D(self.nb_filters, kernel_size=(kernel_size, self.emb_dim + self.pos_dim * 2), padding='valid',
+                                    kernel_regularizer=l2(self.reg_coef_conv))
+            else:
+                conv_layer = Conv2D(self.nb_filters, kernel_size=(kernel_size, self.emb_dim + self.pos_dim * 2), padding='valid')
             # zero padding on embedding layer, only on height
             if kernel_size % 2 == 0:
                 padding_size = int(kernel_size / 2)
@@ -387,22 +379,8 @@ class MCCNN(CNN):
 
 
 class BILSTM(CNN):
-    def __init__(self,
-                 max_sent_len,
-                 vocb,
-                 d1_vocb,
-                 d2_vocb,
-                 num_classes,
-                 emb_dim=100,
-                 pos_dim=10,
-                 rnn_dim=100,
-                 dropout_rate=0.2,
-                 optimizer='adam',
-                 lr_rate=0.001,
-                 non_static=True,
-                 use_pretrained=False,
-                 unk_limit=10000,
-                 use_self_att=False):
+    def __init__(self, max_sent_len, vocb, d1_vocb, d2_vocb, num_classes, emb_dim=100, pos_dim=10, rnn_dim=100, dropout_rate=0.2, optimizer='adam',
+                 lr_rate=0.001, non_static=True, use_pretrained=False, unk_limit=10000, use_self_att=False):
         self.max_sent_len = max_sent_len
         self.vocb = vocb
         self.d1_vocb = d1_vocb
@@ -464,24 +442,9 @@ class BILSTM(CNN):
 
 
 class PCNN(CNN):
-    def __init__(self,
-                 max_sent_len,
-                 vocb,
-                 d1_vocb,
-                 d2_vocb,
-                 num_classes,
-                 emb_dim=100,
-                 pos_dim=10,
-                 kernel_lst=[3, 4, 5],
-                 nb_filters=100,
-                 dropout_rate=0.2,
-                 optimizer='adam',
-                 lr_rate=0.001,
-                 non_static=True,
-                 use_pretrained=False,
-                 unk_limit=10000,
-                 hidden_unit_size=128,
-                 use_batch_norm=False):
+    def __init__(self, max_sent_len, vocb, d1_vocb, d2_vocb, num_classes, emb_dim=100, pos_dim=10, kernel_lst=[3, 4, 5], nb_filters=100,
+                 dropout_rate=0.2, optimizer='adam', lr_rate=0.001, non_static=True, use_pretrained=False, unk_limit=10000, hidden_unit_size=128,
+                 use_batch_norm=False, use_l2_reg=False, reg_coef_conv=0.001, reg_coef_dense=0.001):
         self.max_sent_len = max_sent_len
         self.vocb = vocb
         self.d1_vocb = d1_vocb
@@ -499,6 +462,9 @@ class PCNN(CNN):
         self.num_classes = num_classes
         self.hidden_unit_size = hidden_unit_size
         self.use_batch_norm = use_batch_norm
+        self.use_l2_reg = use_l2_reg
+        self.reg_coef_conv = reg_coef_conv
+        self.reg_coef_dense = reg_coef_dense
         self.build_model()
 
     def add_input_layer(self):
@@ -570,8 +536,10 @@ class PCNN(CNN):
         layer_lst = []
         for kernel_size in self.kernel_lst:
             # Sharing the filter weight
-            conv_layer = Conv1D(filters=self.nb_filters, kernel_size=kernel_size, padding='same')
-
+            if self.use_l2_reg:
+                conv_layer = Conv1D(filters=self.nb_filters, kernel_size=kernel_size, padding='same', kernel_regularizer=l2(self.reg_coef_conv))
+            else:
+                conv_layer = Conv1D(filters=self.nb_filters, kernel_size=kernel_size, padding='same')
             # left, mid, right convolution
             conv_l_left = conv_layer(self.emb_concat_left)
             conv_l_mid = conv_layer(self.emb_concat_mid)
@@ -608,11 +576,17 @@ class PCNN(CNN):
 
     def add_fc_layer(self):
         self.fc_l = self.concat_l
-        self.fc_l = Dense(self.hidden_unit_size)(self.fc_l)
+        if self.use_l2_reg:
+            self.fc_l = Dense(self.hidden_unit_size, kernel_regularizer=l2(self.reg_coef_dense))(self.fc_l)
+        else:
+            self.fc_l = Dense(self.hidden_unit_size)(self.fc_l)
         if self.use_batch_norm:
             self.fc_l = BatchNormalization()(self.fc_l)
         self.fc_l = Activation('relu')(self.fc_l)
-        self.pred_output = Dense(self.num_classes)(self.fc_l)
+        if self.use_l2_reg:
+            self.pred_output = Dense(self.num_classes, kernel_regularizer=l2(self.reg_coef_dense))(self.fc_l)
+        else:
+            self.pred_output = Dense(self.num_classes)(self.fc_l)
         self.pred_output = Activation('softmax')(self.pred_output)
 
     def compile_model(self):
@@ -699,23 +673,9 @@ class PCNN(CNN):
 
 
 class MC_PCNN(PCNN):
-    def __init__(self,
-                 max_sent_len,
-                 vocb,
-                 d1_vocb,
-                 d2_vocb,
-                 num_classes,
-                 emb_dim=100,
-                 pos_dim=10,
-                 kernel_lst=[3, 4, 5],
-                 nb_filters=100,
-                 dropout_rate=0.2,
-                 optimizer='adam',
-                 lr_rate=0.001,
-                 non_static=True,
-                 unk_limit=10000,
-                 hidden_unit_size=128,
-                 use_batch_norm=False):
+    def __init__(self, max_sent_len, vocb, d1_vocb, d2_vocb, num_classes, emb_dim=100, pos_dim=10, kernel_lst=[3, 4, 5], nb_filters=100,
+                 dropout_rate=0.2, optimizer='adam', lr_rate=0.001, non_static=True, unk_limit=10000, hidden_unit_size=128, use_batch_norm=False,
+                 use_l2_reg=False, reg_coef_conv=0.001, reg_coef_dense=0.001):
         self.max_sent_len = max_sent_len
         self.vocb = vocb
         self.d1_vocb = d1_vocb
@@ -732,6 +692,9 @@ class MC_PCNN(PCNN):
         self.num_classes = num_classes
         self.hidden_unit_size = hidden_unit_size
         self.use_batch_norm = use_batch_norm
+        self.use_l2_reg = use_l2_reg
+        self.reg_coef_conv = reg_coef_conv
+        self.reg_coef_dense = reg_coef_dense
         self.build_model()
 
     def add_embedding_layer(self):
@@ -792,7 +755,11 @@ class MC_PCNN(PCNN):
         layer_lst = []
         for kernel_size in self.kernel_lst:
             # Sharing the filter weight
-            conv_layer = Conv2D(self.nb_filters, kernel_size=(kernel_size, self.emb_dim + self.pos_dim * 2), padding='valid')
+            if self.use_l2_reg:
+                conv_layer = Conv2D(self.nb_filters, kernel_size=(kernel_size, self.emb_dim + self.pos_dim * 2), padding='valid',
+                                    kernel_regularizer=l2(self.reg_coef_conv))
+            else:
+                conv_layer = Conv2D(self.nb_filters, kernel_size=(kernel_size, self.emb_dim + self.pos_dim * 2), padding='valid')
 
             # zero padding on embedding layer, only on height
             if kernel_size % 2 == 0:
@@ -839,12 +806,18 @@ class MC_PCNN(PCNN):
 
     def add_fc_layer(self):
         self.fc_l = self.concat_l
-        self.fc_l = Dense(self.hidden_unit_size)(self.fc_l)
+        if self.use_l2_reg:
+            self.fc_l = Dense(self.hidden_unit_size, kernel_regularizer=l2(self.reg_coef_dense))(self.fc_l)
+        else:
+            self.fc_l = Dense(self.hidden_unit_size)(self.fc_l)
         if self.use_batch_norm:
             self.fc_l = BatchNormalization()(self.fc_l)
         self.fc_l = Activation('relu')(self.fc_l)
         self.fc_l = Dropout(self.dropout_rate)(self.fc_l)
-        self.pred_output = Dense(self.num_classes)(self.fc_l)
+        if self.use_l2_reg:
+            self.pred_output = Dense(self.num_classes, kernel_regularizer=l2(self.reg_coef_dense))(self.fc_l)
+        else:
+            self.pred_output = Dense(self.num_classes)(self.fc_l)
         self.pred_output = Activation('softmax')(self.pred_output)
 
     def write_hyperparam(self, nb_epoch, batch_size):

@@ -73,8 +73,8 @@ def load_sentence(filename, max_sent_len):
     print('drug1_lst[0]:', drug1_lst[0])
     print('drug2_lst[0]:', drug2_lst[0])
     print('rel_lst[0]:', rel_lst[0])
-    print('d1_pos_lst[0]:', d1_pos_lst[0])
-    print('d2_pos_lst[0]:', d2_pos_lst[0])
+    # print('d1_pos_lst[0]:', d1_pos_lst[0])
+    # print('d2_pos_lst[0]:', d2_pos_lst[0])
     print('pos_tuple_lst[0]:', pos_tuple_lst[0])
     return sentences, drug1_lst, drug2_lst, rel_lst, d1_pos_lst, d2_pos_lst, pos_tuple_lst
 
