@@ -1,48 +1,13 @@
 from load_data_ddi import load_data, sentence_split_for_pcnn
 from model import CNN, MCCNN, BILSTM, PCNN, MC_PCNN
-
-########### Hyperparameter ###########
-# 1. Training settings
-train_mode = 'mcpcnn' # [cnn, pcnn, mccnn, mcpcnn, rnn]
-nb_epoch = 100
-batch_size = 128
-learning_rate = 0.0005
-optimizer = 'adam'
-use_pretrained = True  # If you're using pretrained, emb_dim will be 200 for PubMed-and-PMC-w2v.bin (http://evexdb.org/pmresources/vec-space-models/)
-dev_size = 0.1
-hidden_unit_size = 256
-use_batch_norm = False
-
-# l2 regularizer setting
-use_l2_reg = True
-reg_coef_conv = 0.0001
-reg_coef_dense = 0.0001
-
-# 2. CNN specific
-kernel_lst = [6, 7, 8, 9]  # [3, 5, 7]
-nb_filters = 200
-
-# 3. RNN specific
-rnn_dim = 200  # Dimension for output of LSTM
-
-# 4. Model common settings
-emb_dim = 200
-pos_dim = 10
-max_sent_len = 150
-num_classes = 5
-unk_limit = 5000
-dropout_rate = 0.5
-
-# 5. Self attention
-use_self_att = False
-######################################
-
+# Get hyperparameter informaction
+from config import *
 
 if __name__ == '__main__':
     (tr_sentences2idx, tr_d1_pos_lst, tr_d2_pos_lst, tr_pos_tuple_lst, tr_y), \
-    (de_sentences2idx, de_d1_pos_lst, de_d2_pos_lst, de_pos_tuple_lst, de_y), \
-    (te_sentences2idx, te_d1_pos_lst, te_d2_pos_lst, te_pos_tuple_lst, te_y), \
-    (vocb, vocb_inv), (d1_vocb, d2_vocb) = load_data(unk_limit=unk_limit, max_sent_len=max_sent_len, dev_size=dev_size)
+        (de_sentences2idx, de_d1_pos_lst, de_d2_pos_lst, de_pos_tuple_lst, de_y), \
+        (te_sentences2idx, te_d1_pos_lst, te_d2_pos_lst, te_pos_tuple_lst, te_y), \
+        (vocb, vocb_inv), (d1_vocb, d2_vocb) = load_data(unk_limit=unk_limit, max_sent_len=max_sent_len, dev_size=dev_size)
 
     if train_mode.lower() == 'pcnn' or train_mode.lower() == 'mcpcnn':
         (tr_sent_left, tr_d1_left, tr_d2_left), (tr_sent_mid, tr_d1_mid, tr_d2_mid), (tr_sent_right, tr_d1_right, tr_d2_right) = \
@@ -80,7 +45,10 @@ if __name__ == '__main__':
                          unk_limit=unk_limit,
                          num_classes=num_classes,
                          hidden_unit_size=hidden_unit_size,
-                         use_batch_norm=use_batch_norm)
+                         use_batch_norm=use_batch_norm,
+                         use_l2_reg=use_l2_reg,
+                         reg_coef_conv=reg_coef_conv,
+                         reg_coef_dense=reg_coef_dense)
         else:
             model = MC_PCNN(max_sent_len=max_sent_len,
                             vocb=vocb,
@@ -106,8 +74,8 @@ if __name__ == '__main__':
         model.save_model()
         model.train(nb_epoch=nb_epoch, batch_size=batch_size, train_data=(
             (tr_sent_left, tr_d1_left, tr_d2_left), (tr_sent_mid, tr_d1_mid, tr_d2_mid), (tr_sent_right, tr_d1_right, tr_d2_right), tr_y),
-                    dev_data=(
-                    (de_sent_left, de_d1_left, de_d2_left), (de_sent_mid, de_d1_mid, de_d2_mid), (de_sent_right, de_d1_right, de_d2_right), de_y))
+            dev_data=(
+            (de_sent_left, de_d1_left, de_d2_left), (de_sent_mid, de_d1_mid, de_d2_mid), (de_sent_right, de_d1_right, de_d2_right), de_y))
         model.evaluate(
             test_data=((te_sent_left, te_d1_left, te_d2_left), (te_sent_mid, te_d1_mid, te_d2_mid), (te_sent_right, te_d1_right, te_d2_right), te_y),
             batch_size=batch_size)
@@ -129,7 +97,10 @@ if __name__ == '__main__':
                         unk_limit=unk_limit,
                         num_classes=num_classes,
                         hidden_unit_size=hidden_unit_size,
-                        use_batch_norm=use_batch_norm)
+                        use_batch_norm=use_batch_norm,
+                        use_l2_reg=use_l2_reg,
+                        reg_coef_conv=reg_coef_conv,
+                        reg_coef_dense=reg_coef_dense)
 
         elif train_mode.lower() == 'mccnn':
             model = MCCNN(max_sent_len=max_sent_len,
@@ -146,7 +117,10 @@ if __name__ == '__main__':
                           unk_limit=unk_limit,
                           num_classes=num_classes,
                           hidden_unit_size=hidden_unit_size,
-                          use_batch_norm=use_batch_norm)
+                          use_batch_norm=use_batch_norm,
+                          use_l2_reg=use_l2_reg,
+                          reg_coef_conv=reg_coef_conv,
+                          reg_coef_dense=reg_coef_dense)
 
         elif train_mode.lower() == 'rnn':
             model = BILSTM(max_sent_len=max_sent_len,

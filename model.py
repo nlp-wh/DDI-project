@@ -19,6 +19,8 @@ import logging
 from load_data_ddi import load_word_matrix, load_test_pair_id, load_word_matrix_all
 from seq_self_attention import SeqSelfAttention
 
+from config import callback_list
+
 # Make the directory for saving model, weight, log
 result_dir = 'result'
 if not os.path.exists(result_dir):
@@ -28,18 +30,6 @@ if not os.path.exists(result_dir):
 tf_board_dir = 'tf_board_log'
 if not os.path.exists(tf_board_dir):
     os.mkdir(tf_board_dir)
-
-# CallBack setting
-callback_list = [
-    # 1. Early Stopping Callback
-    EarlyStopping(monitor='val_acc', patience=5),
-    # 2. Model Checkpoint
-    ModelCheckpoint(filepath=os.path.join(result_dir, 'weights.h5'), monitor='val_acc', save_best_only=True),
-    # 3. Reducing Learning rate automatically
-    ReduceLROnPlateau(monitor='val_acc', patience=2, factor=0.1),  # Reduce the lr_rate into 10%
-    # 4. Tensorboard callback
-    # TensorBoard(log_dir=tf_board_dir, histogram_freq=0, write_graph=True, write_grads=True, write_images=True)
-]
 
 
 class CNN(object):
@@ -119,10 +109,10 @@ class CNN(object):
             if self.use_batch_norm:
                 conv_l = BatchNormalization()(conv_l)
             conv_l = Activation('relu')(conv_l)
-            pool_l = GlobalMaxPool1D()(conv_l)
-            drop_l = Dropout(self.dropout_rate)(pool_l)
+            conv_l = GlobalMaxPool1D()(conv_l)
+            # conv_l = Dropout(self.dropout_rate)(conv_l)
             # Append the final result
-            layer_lst.append(drop_l)
+            layer_lst.append(conv_l)
 
         if len(layer_lst) != 1:
             self.concat_l = concatenate(layer_lst)
@@ -217,8 +207,8 @@ class CNN(object):
 
         # Metrics for Train data
         pred_tr = self.model.predict(x=[tr_sentences2idx, tr_d1_pos_lst, tr_d2_pos_lst], batch_size=batch_size, verbose=1)
-        train_loss = train_history.history['loss'][0]
-        train_acc = train_history.history['acc'][0]
+        # train_loss = train_history.history['loss'][0]
+        # train_acc = train_history.history['acc'][0]
         train_f1 = f1_score(np.argmax(tr_y, 1), np.argmax(pred_tr, 1), [1, 2, 3, 4], average='micro')
         train_p = precision_score(np.argmax(tr_y, 1), np.argmax(pred_tr, 1), [1, 2, 3, 4], average='micro')
         train_r = recall_score(np.argmax(tr_y, 1), np.argmax(pred_tr, 1), [1, 2, 3, 4], average='micro')
@@ -230,8 +220,7 @@ class CNN(object):
         val_r = recall_score(np.argmax(de_y, 1), np.argmax(pred_de, 1), [1, 2, 3, 4], average='micro')
 
         # Writing the log
-        logger.info('##train##, loss: {:.4f}, acc: {:.4f}, prec: {:.4f}, recall: {:.4f}, F1: {:.4f}'.format(
-            train_loss, train_acc, train_p, train_r, train_f1))
+        logger.info('##train##, prec: {:.4f}, recall: {:.4f}, F1: {:.4f}'.format(train_p, train_r, train_f1))
         logger.info('##dev##,   prec: {:.4f}, recall: {:.4f}, F1: {:.4f}'.format(val_p, val_r, val_f1))
 
     def evaluate(self, sentences2idx, d1_lst, d2_lst, y, batch_size):
@@ -350,7 +339,7 @@ class MCCNN(CNN):
             # Maxpool
             conv_l = GlobalMaxPool2D()(conv_l)
             # Dropout
-            conv_l = Dropout(self.dropout_rate)(conv_l)
+            # conv_l = Dropout(self.dropout_rate)(conv_l)
             # Append the final result
             layer_lst.append(conv_l)
         if len(layer_lst) != 1:
@@ -562,9 +551,9 @@ class PCNN(CNN):
             conv_l_right = GlobalMaxPool1D()(conv_l_right)
 
             # Dropout
-            conv_l_left = Dropout(self.dropout_rate)(conv_l_left)
-            conv_l_mid = Dropout(self.dropout_rate)(conv_l_mid)
-            conv_l_right = Dropout(self.dropout_rate)(conv_l_right)
+            # conv_l_left = Dropout(self.dropout_rate)(conv_l_left)
+            # conv_l_mid = Dropout(self.dropout_rate)(conv_l_mid)
+            # conv_l_right = Dropout(self.dropout_rate)(conv_l_right)
 
             # Concat
             layer_lst.append(concatenate([conv_l_left, conv_l_mid, conv_l_right]))
@@ -640,8 +629,8 @@ class PCNN(CNN):
         # Metrics for Train data
         pred_tr = self.model.predict(x=[tr_sent_left, tr_sent_mid, tr_sent_right, tr_d1_left, tr_d1_mid, tr_d1_right,
                                         tr_d2_left, tr_d2_mid, tr_d2_right], batch_size=batch_size, verbose=1)
-        train_loss = train_history.history['loss'][0]
-        train_acc = train_history.history['acc'][0]
+        # train_loss = train_history.history['loss'][0]
+        # train_acc = train_history.history['acc'][0]
         train_f1 = f1_score(np.argmax(tr_y, 1), np.argmax(pred_tr, 1), [1, 2, 3, 4], average='micro')
         train_p = precision_score(np.argmax(tr_y, 1), np.argmax(pred_tr, 1), [1, 2, 3, 4], average='micro')
         train_r = recall_score(np.argmax(tr_y, 1), np.argmax(pred_tr, 1), [1, 2, 3, 4], average='micro')
@@ -654,8 +643,7 @@ class PCNN(CNN):
         val_r = recall_score(np.argmax(de_y, 1), np.argmax(pred_de, 1), [1, 2, 3, 4], average='micro')
 
         # Writing the log
-        logger.info('##train##, loss: {:.4f}, acc: {:.4f}, prec: {:.4f}, recall: {:.4f}, F1: {:.4f}'.format(
-            train_loss, train_acc, train_p, train_r, train_f1))
+        logger.info('##train##, prec: {:.4f}, recall: {:.4f}, F1: {:.4f}'.format(train_p, train_r, train_f1))
         logger.info('##dev##,   prec: {:.4f}, recall: {:.4f}, F1: {:.4f}'.format(val_p, val_r, val_f1))
 
     def evaluate(self, test_data, batch_size):
@@ -792,9 +780,9 @@ class MC_PCNN(PCNN):
             conv_l_right = GlobalMaxPool2D()(conv_l_right)
 
             # Dropout
-            conv_l_left = Dropout(self.dropout_rate)(conv_l_left)
-            conv_l_mid = Dropout(self.dropout_rate)(conv_l_mid)
-            conv_l_right = Dropout(self.dropout_rate)(conv_l_right)
+            # conv_l_left = Dropout(self.dropout_rate)(conv_l_left)
+            # conv_l_mid = Dropout(self.dropout_rate)(conv_l_mid)
+            # conv_l_right = Dropout(self.dropout_rate)(conv_l_right)
 
             # Concat
             layer_lst.append(concatenate([conv_l_left, conv_l_mid, conv_l_right]))
@@ -806,6 +794,7 @@ class MC_PCNN(PCNN):
 
     def add_fc_layer(self):
         self.fc_l = self.concat_l
+        self.fc_l = Dropout(self.dropout_rate)(self.fc_l)  # Put Dropout before fc_layer 
         if self.use_l2_reg:
             self.fc_l = Dense(self.hidden_unit_size, kernel_regularizer=l2(self.reg_coef_dense))(self.fc_l)
         else:
@@ -813,7 +802,7 @@ class MC_PCNN(PCNN):
         if self.use_batch_norm:
             self.fc_l = BatchNormalization()(self.fc_l)
         self.fc_l = Activation('relu')(self.fc_l)
-        self.fc_l = Dropout(self.dropout_rate)(self.fc_l)
+        # self.fc_l = Dropout(self.dropout_rate)(self.fc_l)  # Put Dropout between fc_layer
         if self.use_l2_reg:
             self.pred_output = Dense(self.num_classes, kernel_regularizer=l2(self.reg_coef_dense))(self.fc_l)
         else:
