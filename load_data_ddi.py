@@ -233,6 +233,7 @@ def load_word_matrix(vocb, emb_dim, unk_limit):
     print('{} words not in word vector'.format(cnt))
     return word_matrix
 
+
 def load_word_matrix_from_txt(vocb, emb_dim, unk_limit, word_matrix_file_name):
     print("Loading word2vec {}...".format(word_matrix_file_name))
     # load word2vec by gensim library
@@ -253,7 +254,6 @@ def load_word_matrix_from_txt(vocb, emb_dim, unk_limit, word_matrix_file_name):
         word_matrix = np.zeros((len(vocb), emb_dim))
     else:
         word_matrix = np.zeros((unk_limit, emb_dim))
-    print('word_matrix.shape:', word_matrix.shape)
     cnt = 0
     for word, i in vocb.items():
         if i < unk_limit:
@@ -276,7 +276,11 @@ def load_word_matrix_from_txt(vocb, emb_dim, unk_limit, word_matrix_file_name):
                 cnt += 1
             '''
     print('{} words not in word vector'.format(cnt))
+    # make zero padding array to 0
+    word_matrix[0] = np.full(shape=emb_dim, fill_value=0.0, dtype=np.float32)
+    print('word_matrix.shape:', word_matrix.shape)
     return word_matrix
+
 
 def load_word_matrix_all(vocb, emb_dim, unk_limit):
     word_matrix_lst = []
@@ -389,9 +393,9 @@ def to_piece(sequence, pos_tuple_lst):
     for i in range(len(sequence)):
         left_idx = pos_tuple_lst[i][0]
         right_idx = pos_tuple_lst[i][1]
-        left.append(sequence[i][0:left_idx+1])
-        mid.append(sequence[i][left_idx+1:right_idx+1])
-        right.append(sequence[i][right_idx+1:])
+        left.append(sequence[i][0:left_idx + 1])
+        mid.append(sequence[i][left_idx + 1:right_idx + 1])
+        right.append(sequence[i][right_idx + 1:])
     # Testing
     # print("left[0]:", left[0])
     # print("mid[0]:", mid[0])
