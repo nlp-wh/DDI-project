@@ -70,7 +70,7 @@ if __name__ == '__main__':
                             reg_coef_conv=reg_coef_conv,
                             reg_coef_dense=reg_coef_dense)
 
-        model.show_model_summary()
+        # model.show_model_summary()
         model.save_model()
         model.train(nb_epoch=nb_epoch, batch_size=batch_size, train_data=(
             (tr_sent_left, tr_d1_left, tr_d2_left), (tr_sent_mid, tr_d1_mid, tr_d2_mid), (tr_sent_right, tr_d1_right, tr_d2_right), tr_y),

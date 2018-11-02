@@ -780,9 +780,9 @@ class MC_PCNN(PCNN):
             conv_l_right = GlobalMaxPool2D()(conv_l_right)
 
             # Dropout
-            # conv_l_left = Dropout(self.dropout_rate)(conv_l_left)
-            # conv_l_mid = Dropout(self.dropout_rate)(conv_l_mid)
-            # conv_l_right = Dropout(self.dropout_rate)(conv_l_right)
+            conv_l_left = Dropout(self.dropout_rate)(conv_l_left)
+            conv_l_mid = Dropout(self.dropout_rate)(conv_l_mid)
+            conv_l_right = Dropout(self.dropout_rate)(conv_l_right)
 
             # Concat
             layer_lst.append(concatenate([conv_l_left, conv_l_mid, conv_l_right]))
@@ -794,7 +794,7 @@ class MC_PCNN(PCNN):
 
     def add_fc_layer(self):
         self.fc_l = self.concat_l
-        self.fc_l = Dropout(self.dropout_rate)(self.fc_l)  # Put Dropout before fc_layer 
+        # self.fc_l = Dropout(self.dropout_rate)(self.fc_l)  # Put Dropout before fc_layer 
         if self.use_l2_reg:
             self.fc_l = Dense(self.hidden_unit_size, kernel_regularizer=l2(self.reg_coef_dense))(self.fc_l)
         else:
@@ -802,7 +802,7 @@ class MC_PCNN(PCNN):
         if self.use_batch_norm:
             self.fc_l = BatchNormalization()(self.fc_l)
         self.fc_l = Activation('relu')(self.fc_l)
-        # self.fc_l = Dropout(self.dropout_rate)(self.fc_l)  # Put Dropout between fc_layer
+        self.fc_l = Dropout(self.dropout_rate)(self.fc_l)  # Put Dropout between fc_layer
         if self.use_l2_reg:
             self.pred_output = Dense(self.num_classes, kernel_regularizer=l2(self.reg_coef_dense))(self.fc_l)
         else:
