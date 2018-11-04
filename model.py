@@ -16,7 +16,7 @@ import os
 import sys
 import logging
 
-from load_data_ddi import load_word_matrix, load_test_pair_id, load_word_matrix_all
+from load_data_ddi import load_word_matrix, load_test_pair_id, load_word_matrix_all, load_word_matrix_from_txt
 from seq_self_attention import SeqSelfAttention
 
 from config import callback_list
@@ -79,7 +79,8 @@ class CNN(object):
         # If static, trainable = False. If non-static, trainable = True
         if self.use_pretrained:
             # load word matrix
-            word_matrix = load_word_matrix(self.vocb, self.emb_dim, self.unk_limit)
+            # word_matrix = load_word_matrix(self.vocb, self.emb_dim, self.unk_limit)
+            word_matrix = load_word_matrix_from_txt(self.vocb, self.emb_dim, self.unk_limit, 'pubmed_and_pmc')
             # If static, trainable = False. If non-static, trainable = True
             self.w_emb = Embedding(input_dim=input_dim_len, output_dim=self.emb_dim, input_length=self.max_sent_len,
                                    trainable=self.non_static, weights=[word_matrix])(self.input_x)
@@ -110,7 +111,7 @@ class CNN(object):
                 conv_l = BatchNormalization()(conv_l)
             conv_l = Activation('relu')(conv_l)
             conv_l = GlobalMaxPool1D()(conv_l)
-            # conv_l = Dropout(self.dropout_rate)(conv_l)
+            conv_l = Dropout(self.dropout_rate)(conv_l)
             # Append the final result
             layer_lst.append(conv_l)
 
@@ -339,7 +340,7 @@ class MCCNN(CNN):
             # Maxpool
             conv_l = GlobalMaxPool2D()(conv_l)
             # Dropout
-            # conv_l = Dropout(self.dropout_rate)(conv_l)
+            conv_l = Dropout(self.dropout_rate)(conv_l)
             # Append the final result
             layer_lst.append(conv_l)
         if len(layer_lst) != 1:
@@ -479,7 +480,8 @@ class PCNN(CNN):
 
         if self.use_pretrained:
             # load word matrix
-            word_matrix = load_word_matrix(self.vocb, self.emb_dim, self.unk_limit)
+            # word_matrix = load_word_matrix(self.vocb, self.emb_dim, self.unk_limit)
+            word_matrix = load_word_matrix_from_txt(self.vocb, self.emb_dim, self.unk_limit, 'pubmed_and_pmc')
             # If static, trainable = False. If non-static, trainable = True
             self.w_emb_left = Embedding(input_dim=input_dim_len, output_dim=self.emb_dim, input_length=self.max_sent_len,
                                         trainable=self.non_static, weights=[word_matrix])(self.input_sent_left)
@@ -551,9 +553,9 @@ class PCNN(CNN):
             conv_l_right = GlobalMaxPool1D()(conv_l_right)
 
             # Dropout
-            # conv_l_left = Dropout(self.dropout_rate)(conv_l_left)
-            # conv_l_mid = Dropout(self.dropout_rate)(conv_l_mid)
-            # conv_l_right = Dropout(self.dropout_rate)(conv_l_right)
+            conv_l_left = Dropout(self.dropout_rate)(conv_l_left)
+            conv_l_mid = Dropout(self.dropout_rate)(conv_l_mid)
+            conv_l_right = Dropout(self.dropout_rate)(conv_l_right)
 
             # Concat
             layer_lst.append(concatenate([conv_l_left, conv_l_mid, conv_l_right]))

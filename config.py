@@ -4,7 +4,7 @@ import os
 result_dir = 'result'
 
 # 1. Training settings
-train_mode = 'mcpcnn'  # [cnn, pcnn, mccnn, mcpcnn, rnn]
+train_mode = 'cnn'  # [cnn, pcnn, mccnn, mcpcnn, rnn]
 nb_epoch = 100
 batch_size = 128
 learning_rate = 0.0005
@@ -17,11 +17,11 @@ dropout_rate = 0.5
 
 # l2 regularizer setting
 use_l2_reg = False
-reg_coef_conv = 0.001
-reg_coef_dense = 0.001
+reg_coef_conv = 0.0001
+reg_coef_dense = 0.0001
 
 # 2. CNN specific
-kernel_lst = [6, 7, 8, 9]  # [3, 5, 7]
+kernel_lst = [3, 5, 7, 9]  # [3, 5, 7]
 nb_filters = 200
 
 # 3. RNN specific
