@@ -14,10 +14,10 @@ test_filename = 'test.tsv'
 vocab_filename = 'vocab'
 
 word_vec_file_lst = [
-    'pmc',
-    'pubmed',
+    # 'pmc',
+    # 'pubmed',
     'pubmed_and_pmc',
-    'pubmed_myself',
+    # 'pubmed_myself',
     'wiki_pubmed'
 ]
 
@@ -265,7 +265,7 @@ def load_word_matrix_from_txt(vocb, emb_dim, unk_limit, word_matrix_file_name):
                 word_matrix[i] = np.asarray(vector)
             except:
                 # word2vec에 없는 단어일 시
-                word_matrix[i] = np.random.uniform(-0.1, 0.1, emb_dim)
+                word_matrix[i] = np.random.uniform(-0.25, 0.25, emb_dim)
                 cnt += 1
             '''
             embedding_vector = embedding_index.get(word)
