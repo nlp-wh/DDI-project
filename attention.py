@@ -1,5 +1,5 @@
 from keras.layers import Layer
-
+from keras import regularizers, initializers, constraints
 
 class Attention(Layer):
     def __init__(self, step_dim,
