@@ -111,7 +111,6 @@ class CNN(object):
                 conv_l = BatchNormalization()(conv_l)
             conv_l = Activation('relu')(conv_l)
             conv_l = GlobalMaxPool1D()(conv_l)
-            conv_l = Dropout(self.dropout_rate)(conv_l)
             # Append the final result
             layer_lst.append(conv_l)
 
@@ -119,6 +118,9 @@ class CNN(object):
             self.concat_l = concatenate(layer_lst)
         else:
             self.concat_l = layer_lst[0]
+
+        # Dropout
+        self.concat_l = Dropout(self.dropout_rate)(self.concat_l)
 
     def add_fc_layer(self):
         self.fc_l = self.concat_l
@@ -339,14 +341,16 @@ class MCCNN(CNN):
             conv_l = Activation('relu')(conv_l)
             # Maxpool
             conv_l = GlobalMaxPool2D()(conv_l)
-            # Dropout
-            conv_l = Dropout(self.dropout_rate)(conv_l)
+
             # Append the final result
             layer_lst.append(conv_l)
         if len(layer_lst) != 1:
             self.concat_l = concatenate(layer_lst)
         else:
             self.concat_l = layer_lst[0]
+
+        # Dropout
+        self.concat_l = Dropout(self.dropout_rate)(self.concat_l)
 
     def write_hyperparam(self, nb_epoch, batch_size):
         # mode: cnn | nb_epoch: 30 | batch: 200 | opt: adam | lr: 0.007 | k_lst: [3, 4, 5] | nb_filters: 100 |
@@ -552,11 +556,6 @@ class PCNN(CNN):
             conv_l_mid = GlobalMaxPool1D()(conv_l_mid)
             conv_l_right = GlobalMaxPool1D()(conv_l_right)
 
-            # Dropout
-            conv_l_left = Dropout(self.dropout_rate)(conv_l_left)
-            conv_l_mid = Dropout(self.dropout_rate)(conv_l_mid)
-            conv_l_right = Dropout(self.dropout_rate)(conv_l_right)
-
             # Concat
             layer_lst.append(concatenate([conv_l_left, conv_l_mid, conv_l_right]))
 
@@ -564,6 +563,9 @@ class PCNN(CNN):
             self.concat_l = concatenate(layer_lst)
         else:
             self.concat_l = layer_lst[0]
+        
+        # Dropout
+        self.concat_l = Dropout(self.dropout_rate)(self.concat_l)
 
     def add_fc_layer(self):
         self.fc_l = self.concat_l
@@ -735,6 +737,7 @@ class MC_PCNN(PCNN):
             left_emb_lst.append(emb_concat_left)
             mid_emb_lst.append(emb_concat_mid)
             right_emb_lst.append(emb_concat_right)
+
         # concat all the five embedding
         self.emb_concat_left = concatenate(left_emb_lst)
         self.emb_concat_mid = concatenate(mid_emb_lst)
@@ -781,11 +784,6 @@ class MC_PCNN(PCNN):
             conv_l_mid = GlobalMaxPool2D()(conv_l_mid)
             conv_l_right = GlobalMaxPool2D()(conv_l_right)
 
-            # Dropout
-            conv_l_left = Dropout(self.dropout_rate)(conv_l_left)
-            conv_l_mid = Dropout(self.dropout_rate)(conv_l_mid)
-            conv_l_right = Dropout(self.dropout_rate)(conv_l_right)
-
             # Concat
             layer_lst.append(concatenate([conv_l_left, conv_l_mid, conv_l_right]))
 
@@ -793,10 +791,12 @@ class MC_PCNN(PCNN):
             self.concat_l = concatenate(layer_lst)
         else:
             self.concat_l = layer_lst[0]
+        
+        # Dropout at the last layer
+        self.concat_l = Dropout(self.dropout_rate)(self.concat_l)
 
     def add_fc_layer(self):
         self.fc_l = self.concat_l
-        # self.fc_l = Dropout(self.dropout_rate)(self.fc_l)  # Put Dropout before fc_layer 
         if self.use_l2_reg:
             self.fc_l = Dense(self.hidden_unit_size, kernel_regularizer=l2(self.reg_coef_dense))(self.fc_l)
         else:

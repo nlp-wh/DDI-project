@@ -14,10 +14,10 @@ test_filename = 'test.tsv'
 vocab_filename = 'vocab'
 
 word_vec_file_lst = [
-    # 'pmc',
-    # 'pubmed',
+    'pmc',
+    'pubmed',
     'pubmed_and_pmc',
-    # 'pubmed_myself',
+    'pubmed_myself',
     'wiki_pubmed'
 ]
 
