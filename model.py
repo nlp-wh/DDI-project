@@ -3,7 +3,6 @@ from keras.layers import Dense, Conv1D, MaxPool1D, Flatten, Dropout, Embedding, 
     GlobalMaxPool1D, Activation, SeparableConv1D, Reshape, Conv2D, GlobalMaxPool2D, ZeroPadding2D
 from keras import Model
 from keras.regularizers import l1, l2, l1_l2
-from keras.callbacks import EarlyStopping, ModelCheckpoint, ReduceLROnPlateau, TensorBoard
 from keras.optimizers import Adam, Adadelta, RMSprop, Adagrad
 from sklearn.metrics import f1_score, recall_score, precision_score
 
@@ -15,6 +14,8 @@ from sklearn.metrics import f1_score, recall_score, precision_score
 import os
 import sys
 import logging
+import subprocess
+import platform
 
 from load_data_ddi import load_word_matrix, load_test_pair_id, load_word_matrix_all, load_word_matrix_from_txt
 from seq_self_attention import SeqSelfAttention
@@ -30,6 +31,54 @@ if not os.path.exists(result_dir):
 tf_board_dir = 'tf_board_log'
 if not os.path.exists(tf_board_dir):
     os.mkdir(tf_board_dir)
+
+
+# Save the best result
+def save_best_result(class_name, cur_f1_score):
+    # 0. Replace numpy.float64 to native python type
+    cur_f1_score = float(cur_f1_score)
+    # result - previous_f1 - MCPCNN, CNN
+    # result - best_result - MCPCNN - model.json, weight.h5
+    best_result_dir = os.path.join(result_dir, 'best_result')
+    previous_f1_dir = os.path.join(result_dir, 'previous_f1')
+    model_file_path = os.path.join(result_dir, 'model.json')
+    weight_file_path = os.path.join(result_dir, 'weights.h5')
+    # 1. Make the directory to save the best result, previous_f1_idr
+    if not os.path.exists(best_result_dir):
+        os.mkdir(best_result_dir)
+    if not os.path.exists(previous_f1_dir):
+        os.mkdir(previous_f1_dir)
+    if not os.path.exists(os.path.join(best_result_dir, class_name)):
+        os.mkdir(os.path.join(best_result_dir, class_name))
+    # 2. Get the information of the previous result
+    # 3. If info doesn't exist, make new file. And save the best result
+    previous_score_file_path = os.path.join(previous_f1_dir, class_name)
+    if not os.path.exists(previous_score_file_path):
+        with open(previous_score_file_path, 'w', encoding='utf-8') as f:
+            f.write(str(cur_f1_score))
+            # Save the best result, copy the result
+            if platform.platform().lower().startswith('windows'):
+                subprocess.call(['copy', '.\\' + model_file_path, '.\\' +os.path.join(best_result_dir, class_name), '/y'], shell=True)
+                subprocess.call(['copy', '.\\' + weight_file_path, '.\\' +os.path.join(best_result_dir, class_name), '/y'], shell=True)
+            else:
+                subprocess.call(['cp', model_file_path, os.path.join(best_result_dir, class_name)])
+                subprocess.call(['cp', weight_file_path, os.path.join(best_result_dir, class_name)])
+    else:
+        # 4. If the current result is better than before, save the result
+        #    then, update the result on f1 result file
+        f = open(previous_score_file_path, 'r', encoding='utf-8')
+        pre_f1_score = float(f.read().strip())
+        f.close()
+        if pre_f1_score < cur_f1_score:
+            with open(previous_score_file_path, 'w', encoding='utf-8') as f:
+                f.write(str(cur_f1_score))
+                # Save the best result, copy the result
+                if platform.platform().lower().startswith('windows'):
+                    subprocess.call(['copy', '.\\' + model_file_path, '.\\' +os.path.join(best_result_dir, class_name), '/y'], shell=True)
+                    subprocess.call(['copy', '.\\' + weight_file_path, '.\\' +os.path.join(best_result_dir, class_name), '/y'], shell=True)
+                else:
+                    subprocess.call(['cp', model_file_path, os.path.join(best_result_dir, class_name)])
+                    subprocess.call(['cp', weight_file_path, os.path.join(best_result_dir, class_name)])
 
 
 class CNN(object):
@@ -141,13 +190,13 @@ class CNN(object):
         self.model = Model(inputs=[self.input_x, self.input_d1, self.input_d2], outputs=self.pred_output)
         # Optimizer
         if self.optimizer.lower() == 'adam':
-            opt = Adam(lr=self.lr_rate, decay=0.99)
+            opt = Adam(lr=self.lr_rate)
         elif self.optimizer.lower() == 'rmsprop':
-            opt = RMSprop(lr=self.lr_rate, decay=0.99)
+            opt = RMSprop(lr=self.lr_rate)
         elif self.optimizer.lower() == 'adagrad':
-            opt = Adagrad(lr=self.lr_rate, decay=0.99)
+            opt = Adagrad(lr=self.lr_rate)
         elif self.optimizer.lower() == 'adadelta':
-            opt = Adadelta(lr=self.lr_rate, decay=0.99)
+            opt = Adadelta(lr=self.lr_rate)
         else:
             raise ValueError("Use Optimizer in Adam, RMSProp, Adagrad, Adadelta!")
         # Model compile
@@ -236,6 +285,8 @@ class CNN(object):
         logger.info('##test##, prec: {:.4f}, recall: {:.4f}, F1: {:.4f}'.format(te_p,
                                                                                 te_r,
                                                                                 te_f1))
+        # Save the best result
+        save_best_result(type(self).__name__, te_f1)
 
     def show_model_summary(self):
         print(self.model.summary(line_length=100))
@@ -563,7 +614,7 @@ class PCNN(CNN):
             self.concat_l = concatenate(layer_lst)
         else:
             self.concat_l = layer_lst[0]
-        
+
         # Dropout
         self.concat_l = Dropout(self.dropout_rate)(self.concat_l)
 
@@ -588,13 +639,13 @@ class PCNN(CNN):
                                    self.input_d2_left, self.input_d2_mid, self.input_d2_right], outputs=self.pred_output)
         # Optimizer
         if self.optimizer.lower() == 'adam':
-            opt = Adam(lr=self.lr_rate, decay=0.99)
+            opt = Adam(lr=self.lr_rate)
         elif self.optimizer.lower() == 'rmsprop':
-            opt = RMSprop(lr=self.lr_rate, decay=0.99)
+            opt = RMSprop(lr=self.lr_rate)
         elif self.optimizer.lower() == 'adagrad':
-            opt = Adagrad(lr=self.lr_rate, decay=0.99)
+            opt = Adagrad(lr=self.lr_rate)
         elif self.optimizer.lower() == 'adadelta':
-            opt = Adadelta(lr=self.lr_rate, decay=0.99)
+            opt = Adadelta(lr=self.lr_rate)
         else:
             raise ValueError("Use Optimizer in Adam, RMSProp, Adagrad, Adadelta!")
         # Model compile
@@ -662,6 +713,9 @@ class PCNN(CNN):
         logger.info('##test##, prec: {:.4f}, recall: {:.4f}, F1: {:.4f}'.format(te_p,
                                                                                 te_r,
                                                                                 te_f1))
+
+        # Save the best result
+        save_best_result(type(self).__name__, te_f1)
 
 
 class MC_PCNN(PCNN):
@@ -791,7 +845,7 @@ class MC_PCNN(PCNN):
             self.concat_l = concatenate(layer_lst)
         else:
             self.concat_l = layer_lst[0]
-        
+
         # Dropout at the last layer
         self.concat_l = Dropout(self.dropout_rate)(self.concat_l)
 
