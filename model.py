@@ -58,8 +58,8 @@ def save_best_result(class_name, cur_f1_score):
             f.write(str(cur_f1_score))
             # Save the best result, copy the result
             if platform.platform().lower().startswith('windows'):
-                subprocess.call(['copy', '.\\' + model_file_path, '.\\' +os.path.join(best_result_dir, class_name), '/y'], shell=True)
-                subprocess.call(['copy', '.\\' + weight_file_path, '.\\' +os.path.join(best_result_dir, class_name), '/y'], shell=True)
+                subprocess.call(['copy', '.\\' + model_file_path, '.\\' + os.path.join(best_result_dir, class_name), '/y'], shell=True)
+                subprocess.call(['copy', '.\\' + weight_file_path, '.\\' + os.path.join(best_result_dir, class_name), '/y'], shell=True)
             else:
                 subprocess.call(['cp', model_file_path, os.path.join(best_result_dir, class_name)])
                 subprocess.call(['cp', weight_file_path, os.path.join(best_result_dir, class_name)])
@@ -74,8 +74,8 @@ def save_best_result(class_name, cur_f1_score):
                 f.write(str(cur_f1_score))
                 # Save the best result, copy the result
                 if platform.platform().lower().startswith('windows'):
-                    subprocess.call(['copy', '.\\' + model_file_path, '.\\' +os.path.join(best_result_dir, class_name), '/y'], shell=True)
-                    subprocess.call(['copy', '.\\' + weight_file_path, '.\\' +os.path.join(best_result_dir, class_name), '/y'], shell=True)
+                    subprocess.call(['copy', '.\\' + model_file_path, '.\\' + os.path.join(best_result_dir, class_name), '/y'], shell=True)
+                    subprocess.call(['copy', '.\\' + weight_file_path, '.\\' + os.path.join(best_result_dir, class_name), '/y'], shell=True)
                 else:
                     subprocess.call(['cp', model_file_path, os.path.join(best_result_dir, class_name)])
                     subprocess.call(['cp', weight_file_path, os.path.join(best_result_dir, class_name)])
@@ -883,3 +883,65 @@ class MC_PCNN(PCNN):
                                                                                                                  self.emb_dim, self.pos_dim,
                                                                                                                  self.max_sent_len, self.dropout_rate)
         return log_str_1, log_str_2
+
+
+class MC_PCNN_ATT(MC_PCNN):
+    def add_cnn_layer(self):
+        # CNN Parts
+        layer_lst = []
+        for kernel_size in self.kernel_lst:
+            # Sharing the filter weight
+            if self.use_l2_reg:
+                conv_layer = Conv2D(self.nb_filters, kernel_size=(kernel_size, self.emb_dim + self.pos_dim * 2), padding='valid',
+                                    kernel_regularizer=l2(self.reg_coef_conv))
+            else:
+                conv_layer = Conv2D(self.nb_filters, kernel_size=(kernel_size, self.emb_dim + self.pos_dim * 2), padding='valid')
+
+            # zero padding on embedding layer, only on height
+            if kernel_size % 2 == 0:
+                padding_size = int(kernel_size / 2)
+            else:
+                padding_size = int((kernel_size - 1) / 2)
+            padded_emb_concat_left = ZeroPadding2D((padding_size, 0))(self.emb_concat_left)
+            padded_emb_concat_mid = ZeroPadding2D((padding_size, 0))(self.emb_concat_mid)
+            padded_emb_concat_right = ZeroPadding2D((padding_size, 0))(self.emb_concat_right)
+
+            # left, mid, right convolution
+            conv_l_left = conv_layer(padded_emb_concat_left)
+            conv_l_mid = conv_layer(padded_emb_concat_mid)
+            conv_l_right = conv_layer(padded_emb_concat_right)
+
+            # Batch normalization
+            if self.use_batch_norm:
+                conv_l_left = BatchNormalization()(conv_l_left)
+                conv_l_mid = BatchNormalization()(conv_l_mid)
+                conv_l_right = BatchNormalization()(conv_l_right)
+
+            # Activation
+            conv_l_left = Activation('relu')(conv_l_left)
+            conv_l_mid = Activation('relu')(conv_l_mid)
+            conv_l_right = Activation('relu')(conv_l_right)
+
+            # Maxpool
+            conv_l_left = GlobalMaxPool2D()(conv_l_left)
+            conv_l_mid = GlobalMaxPool2D()(conv_l_mid)
+            conv_l_right = GlobalMaxPool2D()(conv_l_right)
+
+            # Concat
+            conv_l_left = Reshape((1, self.nb_filters))(conv_l_left)
+            conv_l_mid = Reshape((1, self.nb_filters))(conv_l_mid)
+            conv_l_right = Reshape((1, self.nb_filters))(conv_l_right)
+            conv_concat = concatenate([conv_l_left, conv_l_mid, conv_l_right], axis=-2)
+            # TODO: Have to study about the options in detail
+            # TODO: 각 윈도우별로 self attention을 붙여야 하는지, 모든 window를 concat한 [None, 3, 400]의 상태에서 해야할지
+            conv_concat = SeqSelfAttention(attention_activation='sigmoid')(conv_concat)
+            conv_concat = Flatten()(conv_concat)
+            layer_lst.append(conv_concat)
+
+        if len(layer_lst) != 1:
+            self.concat_l = concatenate(layer_lst)
+        else:
+            self.concat_l = layer_lst[0]
+
+        # Dropout at the last layer
+        self.concat_l = Dropout(self.dropout_rate)(self.concat_l)

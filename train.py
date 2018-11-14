@@ -1,7 +1,6 @@
 from load_data_ddi import load_data, sentence_split_for_pcnn
-from model import CNN, MCCNN, BILSTM, PCNN, MC_PCNN
-# Get hyperparameter informaction
-from config import *
+from model import CNN, MCCNN, BILSTM, PCNN, MC_PCNN, MC_PCNN_ATT
+from config import *  # Get hyperparameter informaction
 import numpy as np
 
 if __name__ == '__main__':
@@ -27,7 +26,7 @@ if __name__ == '__main__':
     te_pos_tuple_lst = np.asarray(te_pos_tuple_lst)
     te_y = np.asarray(te_y)
 
-    if train_mode.lower() == 'pcnn' or train_mode.lower() == 'mcpcnn':
+    if train_mode.lower() == 'pcnn' or train_mode.lower() == 'mcpcnn' or train_mode.lower() == 'mcpcnn_att':
         (tr_sent_left, tr_d1_left, tr_d2_left), (tr_sent_mid, tr_d1_mid, tr_d2_mid), (tr_sent_right, tr_d1_right, tr_d2_right) = \
             sentence_split_for_pcnn(sentences2idx=tr_sentences2idx, d1_pos_lst=tr_d1_pos_lst, d2_pos_lst=tr_d1_pos_lst,
                                     pos_tuple_lst=tr_pos_tuple_lst, max_sent_len=max_sent_len)
@@ -67,7 +66,7 @@ if __name__ == '__main__':
                          use_l2_reg=use_l2_reg,
                          reg_coef_conv=reg_coef_conv,
                          reg_coef_dense=reg_coef_dense)
-        else:
+        elif train_mode.lower() == 'mcpcnn':
             model = MC_PCNN(max_sent_len=max_sent_len,
                             vocb=vocb,
                             d1_vocb=d1_vocb,
@@ -87,8 +86,28 @@ if __name__ == '__main__':
                             use_l2_reg=use_l2_reg,
                             reg_coef_conv=reg_coef_conv,
                             reg_coef_dense=reg_coef_dense)
+        elif train_mode.lower() == 'mcpcnn_att':
+            model = MC_PCNN_ATT(max_sent_len=max_sent_len,
+                                vocb=vocb,
+                                d1_vocb=d1_vocb,
+                                d2_vocb=d2_vocb,
+                                emb_dim=emb_dim,
+                                pos_dim=pos_dim,
+                                kernel_lst=kernel_lst,
+                                nb_filters=nb_filters,
+                                dropout_rate=dropout_rate,
+                                optimizer=optimizer,
+                                non_static=True,
+                                lr_rate=learning_rate,
+                                unk_limit=unk_limit,
+                                num_classes=num_classes,
+                                hidden_unit_size=hidden_unit_size,
+                                use_batch_norm=use_batch_norm,
+                                use_l2_reg=use_l2_reg,
+                                reg_coef_conv=reg_coef_conv,
+                                reg_coef_dense=reg_coef_dense)
 
-        # model.show_model_summary()
+        model.show_model_summary()
         model.save_model()
         model.train(nb_epoch=nb_epoch, batch_size=batch_size, train_data=(
             (tr_sent_left, tr_d1_left, tr_d2_left), (tr_sent_mid, tr_d1_mid, tr_d2_mid), (tr_sent_right, tr_d1_right, tr_d2_right), tr_y),
@@ -159,7 +178,7 @@ if __name__ == '__main__':
 
         else:
             raise Exception("Wrong Training Model")
-        # model.show_model_summary()
+        model.show_model_summary()
         model.save_model()
         model.train(nb_epoch=nb_epoch, batch_size=batch_size, train_data=(tr_sentences2idx, tr_d1_pos_lst, tr_d2_pos_lst, tr_y),
                     dev_data=(de_sentences2idx, de_d1_pos_lst, de_d2_pos_lst, de_y))

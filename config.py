@@ -4,7 +4,7 @@ import os
 result_dir = 'result'
 
 # 1. Training settings
-train_mode = 'cnn'  # [cnn, pcnn, mccnn, mcpcnn, rnn]
+train_mode = 'mcpcnn_att'  # [cnn, pcnn, mccnn, mcpcnn, rnn, mcpcnn_att]
 nb_epoch = 100
 batch_size = 64
 learning_rate = 0.0005
