@@ -41,7 +41,7 @@ use_self_att = False
 # CallBack setting
 callback_list = [
     # 1. Early Stopping Callback
-    EarlyStopping(monitor='val_loss', patience=4),
+    EarlyStopping(monitor='val_loss', patience=5),
     # 2. Model Checkpoint
     ModelCheckpoint(filepath=os.path.join(result_dir, 'weights.h5'), monitor='val_loss', save_best_only=True),
     # 3. Reducing Learning rate automatically
