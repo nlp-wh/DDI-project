@@ -191,13 +191,13 @@ class CNN(object):
         self.model = Model(inputs=[self.input_x, self.input_d1, self.input_d2], outputs=self.pred_output)
         # Optimizer
         if self.optimizer.lower() == 'adam':
-            opt = Adam(lr=self.lr_rate, decay=0.9)
+            opt = Adam(lr=self.lr_rate)
         elif self.optimizer.lower() == 'rmsprop':
-            opt = RMSprop(lr=self.lr_rate, decay=0.9)
+            opt = RMSprop(lr=self.lr_rate)
         elif self.optimizer.lower() == 'adagrad':
-            opt = Adagrad(lr=self.lr_rate, decay=0.9)
+            opt = Adagrad(lr=self.lr_rate)
         elif self.optimizer.lower() == 'adadelta':
-            opt = Adadelta(lr=self.lr_rate, decay=0.9)
+            opt = Adadelta(lr=self.lr_rate)
         else:
             raise ValueError("Use Optimizer in Adam, RMSProp, Adagrad, Adadelta!")
         # Model compile
@@ -640,13 +640,13 @@ class PCNN(CNN):
                                    self.input_d2_left, self.input_d2_mid, self.input_d2_right], outputs=self.pred_output)
         # Optimizer
         if self.optimizer.lower() == 'adam':
-            opt = Adam(lr=self.lr_rate, decay=0.9)
+            opt = Adam(lr=self.lr_rate)
         elif self.optimizer.lower() == 'rmsprop':
-            opt = RMSprop(lr=self.lr_rate, decay=0.9)
+            opt = RMSprop(lr=self.lr_rate)
         elif self.optimizer.lower() == 'adagrad':
-            opt = Adagrad(lr=self.lr_rate, decay=0.9)
+            opt = Adagrad(lr=self.lr_rate)
         elif self.optimizer.lower() == 'adadelta':
-            opt = Adadelta(lr=self.lr_rate, decay=0.9)
+            opt = Adadelta(lr=self.lr_rate)
         else:
             raise ValueError("Use Optimizer in Adam, RMSProp, Adagrad, Adadelta!")
         # Model compile
