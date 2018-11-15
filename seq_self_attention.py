@@ -4,7 +4,6 @@ import tensorflow as tf
 
 
 class SeqSelfAttention(keras.layers.Layer):
-
     ATTENTION_TYPE_ADD = 'additive'
     ATTENTION_TYPE_MUL = 'multiplicative'
 
@@ -13,6 +12,7 @@ class SeqSelfAttention(keras.layers.Layer):
                  attention_width=None,
                  attention_type=ATTENTION_TYPE_ADD,
                  return_attention=False,
+                 history_only=False,
                  kernel_initializer='glorot_normal',
                  bias_initializer='zeros',
                  kernel_regularizer=None,
@@ -25,11 +25,11 @@ class SeqSelfAttention(keras.layers.Layer):
                  attention_regularizer_weight=0.0,
                  **kwargs):
         """Layer initialization.
-
         :param units: The dimension of the vectors that used to calculate the attention weights.
         :param attention_width: The width of local attention.
         :param attention_type: 'additive' or 'multiplicative'.
         :param return_attention: Whether to return the attention weights for visualization.
+        :param history_only: Only use historical pieces of data.
         :param kernel_initializer: The initializer for weight matrices.
         :param bias_initializer: The initializer for biases.
         :param kernel_regularizer: The regularization for weight matrices.
@@ -48,6 +48,9 @@ class SeqSelfAttention(keras.layers.Layer):
         self.attention_width = attention_width
         self.attention_type = attention_type
         self.return_attention = return_attention
+        self.history_only = history_only
+        if history_only and attention_width is None:
+            self.attention_width = int(1e10)
 
         self.use_additive_bias = use_additive_bias
         self.use_attention_bias = use_attention_bias
@@ -77,6 +80,7 @@ class SeqSelfAttention(keras.layers.Layer):
             'attention_width': self.attention_width,
             'attention_type': self.attention_type,
             'return_attention': self.return_attention,
+            'history_only': self.history_only,
             'use_additive_bias': self.use_additive_bias,
             'use_attention_bias': self.use_attention_bias,
             'kernel_initializer': keras.regularizers.serialize(self.kernel_initializer),
@@ -164,10 +168,21 @@ class SeqSelfAttention(keras.layers.Layer):
 
         if self.attention_activation is not None:
             e = self.attention_activation(e)
-        e = K.exp(e)
+        e = K.exp(e - K.max(e, axis=-1, keepdims=True))
         if self.attention_width is not None:
             ones = tf.ones((input_len, input_len))
-            local = tf.matrix_band_part(ones, self.attention_width // 2, (self.attention_width - 1) // 2)
+            if self.history_only:
+                local = tf.matrix_band_part(
+                    ones,
+                    K.minimum(input_len, self.attention_width - 1),
+                    0,
+                )
+            else:
+                local = tf.matrix_band_part(
+                    ones,
+                    K.minimum(input_len, self.attention_width // 2),
+                    K.minimum(input_len, (self.attention_width - 1) // 2),
+                )
             e = e * K.expand_dims(local, 0)
         if mask is not None:
             mask = K.cast(mask, K.floatx())
@@ -180,8 +195,7 @@ class SeqSelfAttention(keras.layers.Layer):
         a = e / (s + K.epsilon())
 
         # l_t = \sum_{t'} a_{t, t'} x_{t'}
-        inputs = K.permute_dimensions(inputs, (0, 2, 1))
-        v = K.permute_dimensions(K.batch_dot(inputs, K.permute_dimensions(a, (0, 2, 1))), (0, 2, 1))
+        v = K.batch_dot(a, inputs)
         if self.attention_regularizer_weight > 0.0:
             self.add_loss(self._attention_regularizer(a))
 

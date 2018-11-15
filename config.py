@@ -10,7 +10,7 @@ batch_size = 64
 learning_rate = 0.0005
 optimizer = 'adam'
 use_pretrained = True  # If you're using pretrained, emb_dim will be 200 for PubMed-and-PMC-w2v.bin (http://evexdb.org/pmresources/vec-space-models/)
-dev_size = 0.05
+dev_size = 0.1
 hidden_unit_size = 256
 use_batch_norm = True
 dropout_rate = 0.5
@@ -41,7 +41,7 @@ use_self_att = False
 # CallBack setting
 callback_list = [
     # 1. Early Stopping Callback
-    EarlyStopping(monitor='val_loss', patience=5),
+    EarlyStopping(monitor='val_loss', patience=4),
     # 2. Model Checkpoint
     ModelCheckpoint(filepath=os.path.join(result_dir, 'weights.h5'), monitor='val_loss', save_best_only=True),
     # 3. Reducing Learning rate automatically
