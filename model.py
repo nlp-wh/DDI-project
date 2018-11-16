@@ -685,8 +685,6 @@ class PCNN(CNN):
         # Metrics for Train data
         pred_tr = self.model.predict(x=[tr_sent_left, tr_sent_mid, tr_sent_right, tr_d1_left, tr_d1_mid, tr_d1_right,
                                         tr_d2_left, tr_d2_mid, tr_d2_right], batch_size=batch_size, verbose=1)
-        # train_loss = train_history.history['loss'][0]
-        # train_acc = train_history.history['acc'][0]
         train_f1 = f1_score(np.argmax(tr_y, 1), np.argmax(pred_tr, 1), [1, 2, 3, 4], average='micro')
         train_p = precision_score(np.argmax(tr_y, 1), np.argmax(pred_tr, 1), [1, 2, 3, 4], average='micro')
         train_r = recall_score(np.argmax(tr_y, 1), np.argmax(pred_tr, 1), [1, 2, 3, 4], average='micro')
@@ -701,7 +699,7 @@ class PCNN(CNN):
         # Writing the log
         logger.info('##train##, prec: {:.4f}, recall: {:.4f}, F1: {:.4f}'.format(train_p, train_r, train_f1))
         logger.info('##dev##,   prec: {:.4f}, recall: {:.4f}, F1: {:.4f}'.format(val_p, val_r, val_f1))
-
+    
     def evaluate(self, test_data, batch_size):
         (te_sent_left, te_d1_left, te_d2_left), (te_sent_mid, te_d1_mid, te_d2_mid), (te_sent_right, te_d1_right, te_d2_right), te_y = test_data
         self.model.load_weights(os.path.join(result_dir, 'weights.h5'))
@@ -936,7 +934,7 @@ class MC_PCNN_ATT(MC_PCNN):
             # TODO: Have to study about the options in detail
             # TODO: 각 윈도우별로 self attention을 붙여야 하는지, 모든 window를 concat한 [None, 3, 400]의 상태에서 해야할지
             # conv_concat = SeqSelfAttention(units=64, attention_activation='sigmoid')(conv_concat)  # Base self attention
-            conv_concat = SeqSelfAttention(units=64,
+            conv_concat = SeqSelfAttention(units=32,
                                            attention_activation='sigmoid',
                                            kernel_regularizer=l2(1e-6),
                                            bias_regularizer=l1(1e-6),

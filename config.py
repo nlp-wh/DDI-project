@@ -22,7 +22,7 @@ reg_coef_dense = 1e-7
 
 # 2. CNN specific
 kernel_lst = [3, 5, 7, 9]  # [3, 5, 7]
-nb_filters = 100
+nb_filters = 128
 
 # 3. RNN specific
 rnn_dim = 200  # Dimension for output of LSTM
