@@ -106,9 +106,6 @@ venv.bak/
 #################################################################
 result
 word2vec/*.bin
-data/neg_filtered
-data/new_data
-data/orig
 data/vocab
 .idea
 output.tsv
