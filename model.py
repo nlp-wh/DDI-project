@@ -477,12 +477,10 @@ class BILSTM(CNN):
         #                         attention_regularizer_weight=1e-4,
         #                         name='Attention')(self.rnn_l)
         self.flat_l = Flatten()(self.att_l)
-        self.dense_1000_l = Dense(1000)(self.flat_l)
-        self.pred_output = Dense(self.num_classes, activation='softmax')(self.dense_1000_l)
+        self.pred_output = Dense(self.num_classes, activation='softmax')(self.flat_l)
 
     def add_fc_layer(self):
         self.rnn_l = Flatten()(self.rnn_l)
-        self.rnn_l = Dense(3000)(self.rnn_l)
         self.rnn_l = Activation('relu')(self.rnn_l)
         self.pred_output = Dense(self.num_classes, activation='softmax')(self.rnn_l)
 

@@ -5,25 +5,25 @@ import random
 result_dir = 'result'
 
 # 1. Training settings
-train_mode = 'mcpcnn_att'  # [cnn, pcnn, mccnn, mcpcnn, rnn, mcpcnn_att]
+train_mode = 'rnn'  # [cnn, pcnn, mccnn, mcpcnn, rnn, mcpcnn_att]
 nb_epoch = 100
-batch_size = 64
+batch_size = random.choice([32, 64])
 learning_rate = 0.0005
 optimizer = 'adam'
-use_pretrained = True  # If you're using pretrained, emb_dim will be 200 for PubMed-and-PMC-w2v.bin (http://evexdb.org/pmresources/vec-space-models/)
+use_pretrained = True
 dev_size = 0.1
 hidden_unit_size = random.choice([256, 512])
 use_batch_norm = True
-dropout_rate = random.choice([0.1, 0.2, 0.3, 0.4, 0.5])
+dropout_rate = random.choice([0.3, 0.4, 0.5])
 
 # l2 regularizer setting
 use_l2_reg = True
-reg_coef_conv = random.choice([1e-3, 1e-4, 1e-5, 1e-6, 1e-7])
-reg_coef_dense = random.choice([1e-3, 1e-4, 1e-5, 1e-6, 1e-7])
+reg_coef_conv = random.choice([1e-6, 1e-7])
+reg_coef_dense = random.choice([1e-6, 1e-7])
 
 # 2. CNN specific
 kernel_lst = [3, 5, 7, 9]  # [3, 5, 7]
-nb_filters = random.choice([64, 100, 128, 200])
+nb_filters = random.choice([80, 100, 120, 140])
 
 # 3. RNN specific
 rnn_dim = 200  # Dimension for output of LSTM

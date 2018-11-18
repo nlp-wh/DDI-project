@@ -110,3 +110,4 @@ data/vocab
 .idea
 output.tsv
 tf_board_log
+deprecated
