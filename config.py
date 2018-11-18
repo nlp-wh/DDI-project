@@ -1,5 +1,6 @@
 from keras.callbacks import EarlyStopping, ModelCheckpoint, ReduceLROnPlateau, TensorBoard
 import os
+import random
 
 result_dir = 'result'
 
@@ -11,28 +12,28 @@ learning_rate = 0.0005
 optimizer = 'adam'
 use_pretrained = True  # If you're using pretrained, emb_dim will be 200 for PubMed-and-PMC-w2v.bin (http://evexdb.org/pmresources/vec-space-models/)
 dev_size = 0.1
-hidden_unit_size = 256
+hidden_unit_size = random.choice([256, 512])
 use_batch_norm = True
-dropout_rate = 0.5
+dropout_rate = random.choice([0.1, 0.2, 0.3, 0.4, 0.5])
 
 # l2 regularizer setting
 use_l2_reg = True
-reg_coef_conv = 1e-7
-reg_coef_dense = 1e-7
+reg_coef_conv = random.choice([1e-3, 1e-4, 1e-5, 1e-6, 1e-7])
+reg_coef_dense = random.choice([1e-3, 1e-4, 1e-5, 1e-6, 1e-7])
 
 # 2. CNN specific
 kernel_lst = [3, 5, 7, 9]  # [3, 5, 7]
-nb_filters = 128
+nb_filters = random.choice([64, 100, 128, 200])
 
 # 3. RNN specific
 rnn_dim = 200  # Dimension for output of LSTM
 
 # 4. Model common settings
 emb_dim = 200
-pos_dim = 10
+pos_dim = random.choice([10, 20])
 max_sent_len = 150
 num_classes = 5
-unk_limit = 3000
+unk_limit = random.choice([3000, 3500])
 
 # 5. Self attention
 use_self_att = False

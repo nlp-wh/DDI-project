@@ -933,12 +933,12 @@ class MC_PCNN_ATT(MC_PCNN):
             conv_concat = concatenate([conv_l_left, conv_l_mid, conv_l_right], axis=-2)
             # TODO: Have to study about the options in detail
             # TODO: 각 윈도우별로 self attention을 붙여야 하는지, 모든 window를 concat한 [None, 3, 400]의 상태에서 해야할지
-            # conv_concat = SeqSelfAttention(units=64, attention_activation='sigmoid')(conv_concat)  # Base self attention
-            conv_concat = SeqSelfAttention(units=32,
-                                           attention_activation='sigmoid',
-                                           kernel_regularizer=l2(1e-6),
-                                           bias_regularizer=l1(1e-6),
-                                           attention_regularizer_weight=1e-6)(conv_concat)
+            conv_concat = SeqSelfAttention(units=32, attention_activation='sigmoid')(conv_concat)  # Base self attention
+            # conv_concat = SeqSelfAttention(units=32,
+            #                                attention_activation='sigmoid',
+            #                                kernel_regularizer=l2(1e-6),
+            #                                bias_regularizer=l1(1e-6),
+            #                                attention_regularizer_weight=1e-6)(conv_concat)
             conv_concat = Flatten()(conv_concat)
             layer_lst.append(conv_concat)
 
