@@ -19,7 +19,6 @@ import platform
 
 from load_data_ddi import load_word_matrix, load_test_pair_id, load_word_matrix_all, load_word_matrix_from_txt
 from seq_self_attention import SeqSelfAttention
-from attention import Attention
 
 from config import callback_list
 
@@ -929,7 +928,10 @@ class MC_PCNN_ATT(MC_PCNN):
             conv_l_mid = Reshape((1, self.nb_filters))(conv_l_mid)
             conv_l_right = Reshape((1, self.nb_filters))(conv_l_right)
             conv_concat = concatenate([conv_l_left, conv_l_mid, conv_l_right], axis=-2)
-            # TODO: Have to study about the options in detail
+
+            # Add dropout until Self-Attention
+            # conv_concat = Dropout(self.dropout_rate)(conv_concat)
+
             # TODO: 각 윈도우별로 self attention을 붙여야 하는지, 모든 window를 concat한 [None, 3, 400]의 상태에서 해야할지
             conv_concat = SeqSelfAttention(units=32, attention_activation='sigmoid')(conv_concat)  # Base self attention
             # conv_concat = SeqSelfAttention(units=32,
