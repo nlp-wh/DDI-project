@@ -14,13 +14,10 @@ from sklearn.metrics import f1_score, recall_score, precision_score
 import os
 import sys
 import logging
-import subprocess
-import platform
 
-from load_data_ddi import load_word_matrix, load_test_pair_id, load_word_matrix_all, load_word_matrix_from_txt
+from load_data_ddi import load_test_pair_id, load_word_matrix_all, load_word_matrix_from_txt
 from seq_self_attention import SeqSelfAttention
-
-from config import callback_list
+from utils import save_best_result
 
 # Make the directory for saving model, weight, log
 result_dir = 'result'
@@ -33,78 +30,31 @@ if not os.path.exists(tf_board_dir):
     os.mkdir(tf_board_dir)
 
 
-# Save the best result
-def save_best_result(class_name, cur_f1_score):
-    # 0. Replace numpy.float64 to native python type
-    cur_f1_score = float(cur_f1_score)
-    # result - previous_f1 - MCPCNN, CNN
-    # result - best_result - MCPCNN - model.json, weight.h5
-    best_result_dir = os.path.join(result_dir, 'best_result')
-    previous_f1_dir = os.path.join(result_dir, 'previous_f1')
-    model_file_path = os.path.join(result_dir, 'model.json')
-    weight_file_path = os.path.join(result_dir, 'weights.h5')
-    # 1. Make the directory to save the best result, previous_f1_idr
-    if not os.path.exists(best_result_dir):
-        os.mkdir(best_result_dir)
-    if not os.path.exists(previous_f1_dir):
-        os.mkdir(previous_f1_dir)
-    if not os.path.exists(os.path.join(best_result_dir, class_name)):
-        os.mkdir(os.path.join(best_result_dir, class_name))
-    # 2. Get the information of the previous result
-    # 3. If info doesn't exist, make new file. And save the best result
-    previous_score_file_path = os.path.join(previous_f1_dir, class_name)
-    if not os.path.exists(previous_score_file_path):
-        with open(previous_score_file_path, 'w', encoding='utf-8') as f:
-            f.write(str(cur_f1_score))
-            # Save the best result, copy the result
-            if platform.platform().lower().startswith('windows'):
-                subprocess.call(['copy', '.\\' + model_file_path, '.\\' + os.path.join(best_result_dir, class_name), '/y'], shell=True)
-                subprocess.call(['copy', '.\\' + weight_file_path, '.\\' + os.path.join(best_result_dir, class_name), '/y'], shell=True)
-            else:
-                subprocess.call(['cp', model_file_path, os.path.join(best_result_dir, class_name)])
-                subprocess.call(['cp', weight_file_path, os.path.join(best_result_dir, class_name)])
-    else:
-        # 4. If the current result is better than before, save the result
-        #    then, update the result on f1 result file
-        f = open(previous_score_file_path, 'r', encoding='utf-8')
-        pre_f1_score = float(f.read().strip())
-        f.close()
-        if pre_f1_score < cur_f1_score:
-            with open(previous_score_file_path, 'w', encoding='utf-8') as f:
-                f.write(str(cur_f1_score))
-                # Save the best result, copy the result
-                if platform.platform().lower().startswith('windows'):
-                    subprocess.call(['copy', '.\\' + model_file_path, '.\\' + os.path.join(best_result_dir, class_name), '/y'], shell=True)
-                    subprocess.call(['copy', '.\\' + weight_file_path, '.\\' + os.path.join(best_result_dir, class_name), '/y'], shell=True)
-                else:
-                    subprocess.call(['cp', model_file_path, os.path.join(best_result_dir, class_name)])
-                    subprocess.call(['cp', weight_file_path, os.path.join(best_result_dir, class_name)])
-
-
 class CNN(object):
-    def __init__(self, max_sent_len, vocb, d1_vocb, d2_vocb, num_classes, emb_dim=100, pos_dim=10, kernel_lst=[3, 4, 5], nb_filters=100,
-                 dropout_rate=0.2, optimizer='adam', lr_rate=0.001, non_static=True, use_pretrained=False, unk_limit=10000, hidden_unit_size=128,
-                 use_batch_norm=False, use_l2_reg=False, reg_coef_conv=0.001, reg_coef_dense=0.001):
-        self.max_sent_len = max_sent_len
+    def __init__(self, cfg, vocb, d1_vocb, d2_vocb):
+        self.cfg = cfg
         self.vocb = vocb
         self.d1_vocb = d1_vocb
         self.d2_vocb = d2_vocb
-        self.emb_dim = emb_dim
-        self.pos_dim = pos_dim
-        self.kernel_lst = kernel_lst
-        self.nb_filters = nb_filters
-        self.dropout_rate = dropout_rate
-        self.optimizer = optimizer
-        self.lr_rate = lr_rate
-        self.non_static = non_static
-        self.use_pretrained = use_pretrained
-        self.unk_limit = unk_limit
-        self.num_classes = num_classes
-        self.hidden_unit_size = hidden_unit_size
-        self.use_batch_norm = use_batch_norm
-        self.use_l2_reg = use_l2_reg
-        self.reg_coef_conv = reg_coef_conv
-        self.reg_coef_dense = reg_coef_dense
+        self.nb_epoch = cfg.nb_epoch
+        self.batch_size = cfg.batch_size
+        self.max_sent_len = cfg.max_sent_len
+        self.emb_dim = cfg.emb_dim
+        self.pos_dim = cfg.pos_dim
+        self.kernel_lst = cfg.kernel_lst
+        self.nb_filters = cfg.nb_filters
+        self.dropout_rate = cfg.dropout_rate
+        self.optimizer = cfg.optimizer
+        self.lr_rate = cfg.lr_rate
+        self.non_static = cfg.non_static
+        self.use_pretrained = cfg.use_pretrained
+        self.unk_limit = cfg.unk_limit
+        self.num_classes = cfg.num_classes
+        self.hidden_unit_size = cfg.hidden_unit_size
+        self.use_batch_norm = cfg.use_batch_norm
+        self.use_l2_reg = cfg.use_l2_reg
+        self.reg_coef_conv = cfg.reg_coef_conv
+        self.reg_coef_dense = cfg.reg_coef_dense
         self.build_model()
 
     def build_model(self):
@@ -128,7 +78,6 @@ class CNN(object):
         # If static, trainable = False. If non-static, trainable = True
         if self.use_pretrained:
             # load word matrix
-            # word_matrix = load_word_matrix(self.vocb, self.emb_dim, self.unk_limit)
             word_matrix = load_word_matrix_from_txt(self.vocb, self.emb_dim, self.unk_limit, 'pubmed_and_pmc')
             # If static, trainable = False. If non-static, trainable = True
             self.w_emb = Embedding(input_dim=input_dim_len, output_dim=self.emb_dim, input_length=self.max_sent_len,
@@ -211,7 +160,7 @@ class CNN(object):
             json_file.write(model_json)
         print('Save model.json')
 
-    def write_hyperparam(self, nb_epoch, batch_size):
+    def write_hyperparam(self):
         # mode: cnn | nb_epoch: 30 | batch: 200 | opt: adam | lr: 0.007 | pretrain: True | k_lst: [3, 4, 5] | nb_filters: 100 |
         # emb_dim: 200 | pos_dim: 10 | sent_len: 150 | dropout: 0.8
         # Write k_lst
@@ -221,7 +170,8 @@ class CNN(object):
         k_lst_str = k_lst_str.rstrip()
         k_lst_str += "]"
         log_str_1 = "mode: {} | nb_epoch: {} | batch: {} | opt: {} | lr: {} | pretrain: {} | hidden_unit_size: {}".format(type(self).__name__,
-                                                                                                                          nb_epoch, batch_size,
+                                                                                                                          self.nb_epoch,
+                                                                                                                          self.batch_size,
                                                                                                                           self.optimizer,
                                                                                                                           self.lr_rate,
                                                                                                                           self.use_pretrained,
@@ -231,7 +181,7 @@ class CNN(object):
                                                                                                                  self.max_sent_len, self.dropout_rate)
         return log_str_1, log_str_2
 
-    def train(self, nb_epoch, batch_size, train_data, dev_data):
+    def train(self, train_data, dev_data):
         # Unpack data
         (tr_sentences2idx, tr_d1_pos_lst, tr_d2_pos_lst, tr_y) = train_data
         (de_sentences2idx, de_d1_pos_lst, de_d2_pos_lst, de_y) = dev_data
@@ -245,20 +195,22 @@ class CNN(object):
         logger.info('')
         logger.info("#################################### New Start #####################################")
         # Write log for the hyperparameter
-        log_str_1, log_str_2 = self.write_hyperparam(nb_epoch, batch_size)
+        log_str_1, log_str_2 = self.write_hyperparam()
         logger.info(log_str_1)
         logger.info(log_str_2)
         logger.info('')
 
         # Training
-        train_history = self.model.fit(x=[tr_sentences2idx, tr_d1_pos_lst, tr_d2_pos_lst], y=tr_y, epochs=nb_epoch, batch_size=batch_size,
-                                       verbose=1, validation_data=[[de_sentences2idx, de_d1_pos_lst, de_d2_pos_lst], de_y], callbacks=callback_list)
+        self.model.fit(x=[tr_sentences2idx, tr_d1_pos_lst, tr_d2_pos_lst], y=tr_y, epochs=self.nb_epoch,
+                       batch_size=self.batch_size,
+                       verbose=1, validation_data=[[de_sentences2idx, de_d1_pos_lst, de_d2_pos_lst], de_y],
+                       callbacks=self.cfg.callback_list)
 
         # load the best result
         self.model.load_weights(os.path.join(result_dir, 'weights.h5'))
 
         # Metrics for Train data
-        pred_tr = self.model.predict(x=[tr_sentences2idx, tr_d1_pos_lst, tr_d2_pos_lst], batch_size=batch_size, verbose=1)
+        pred_tr = self.model.predict(x=[tr_sentences2idx, tr_d1_pos_lst, tr_d2_pos_lst], batch_size=self.batch_size, verbose=1)
         # train_loss = train_history.history['loss'][0]
         # train_acc = train_history.history['acc'][0]
         train_f1 = f1_score(np.argmax(tr_y, 1), np.argmax(pred_tr, 1), [1, 2, 3, 4], average='micro')
@@ -266,7 +218,7 @@ class CNN(object):
         train_r = recall_score(np.argmax(tr_y, 1), np.argmax(pred_tr, 1), [1, 2, 3, 4], average='micro')
 
         # Metrics for Dev data
-        pred_de = self.model.predict(x=[de_sentences2idx, de_d1_pos_lst, de_d2_pos_lst], batch_size=batch_size, verbose=1)
+        pred_de = self.model.predict(x=[de_sentences2idx, de_d1_pos_lst, de_d2_pos_lst], batch_size=self.batch_size, verbose=1)
         val_f1 = f1_score(np.argmax(de_y, 1), np.argmax(pred_de, 1), [1, 2, 3, 4], average='micro')
         val_p = precision_score(np.argmax(de_y, 1), np.argmax(pred_de, 1), [1, 2, 3, 4], average='micro')
         val_r = recall_score(np.argmax(de_y, 1), np.argmax(pred_de, 1), [1, 2, 3, 4], average='micro')
@@ -275,9 +227,10 @@ class CNN(object):
         logger.info('##train##, prec: {:.4f}, recall: {:.4f}, F1: {:.4f}'.format(train_p, train_r, train_f1))
         logger.info('##dev##,   prec: {:.4f}, recall: {:.4f}, F1: {:.4f}'.format(val_p, val_r, val_f1))
 
-    def evaluate(self, sentences2idx, d1_lst, d2_lst, y, batch_size):
+    def evaluate(self, test_data):
+        (sentences2idx, d1_lst, d2_lst), y = test_data
         self.model.load_weights(os.path.join(result_dir, 'weights.h5'))
-        pred_te = self.model.predict(x=[sentences2idx, d1_lst, d2_lst], batch_size=batch_size, verbose=1)
+        pred_te = self.model.predict(x=[sentences2idx, d1_lst, d2_lst], batch_size=self.batch_size, verbose=1)
         te_f1 = f1_score(np.argmax(y, 1), np.argmax(pred_te, 1), [1, 2, 3, 4], average='micro')
         te_p = precision_score(np.argmax(y, 1), np.argmax(pred_te, 1), [1, 2, 3, 4], average='micro')
         te_r = recall_score(np.argmax(y, 1), np.argmax(pred_te, 1), [1, 2, 3, 4], average='micro')
@@ -286,14 +239,14 @@ class CNN(object):
                                                                                 te_r,
                                                                                 te_f1))
         # Save the best result
-        save_best_result(type(self).__name__, te_f1)
+        save_best_result(type(self).__name__, te_f1, result_dir)
 
     def show_model_summary(self):
         print(self.model.summary(line_length=100))
 
-    def predict(self, sentences2idx, d1_lst, d2_lst, batch_size, one_hot=True):
+    def predict(self, sentences2idx, d1_lst, d2_lst, one_hot=True):
         self.model.load_weights(os.path.join(result_dir, 'weights.h5'))
-        y_pred = self.model.predict(x=[sentences2idx, d1_lst, d2_lst], batch_size=batch_size)
+        y_pred = self.model.predict(x=[sentences2idx, d1_lst, d2_lst], batch_size=self.batch_size)
         print(y_pred.shape)
         print(y_pred[:5])
         if one_hot:
@@ -311,38 +264,30 @@ class CNN(object):
         print(one_hot[:5])
         return one_hot
 
-    @staticmethod
-    def make_output_file(y_pred):
-        pair_id_lst = load_test_pair_id()
-        with open('output.tsv', 'w', encoding='utf-8') as f:
-            assert len(y_pred) == len(pair_id_lst)
-            for pair_id, y in zip(pair_id_lst, y_pred):
-                line = "{}\t{}\t{}\n".format("DDI2013", pair_id, y)
-                f.write(line)
-
 
 class MCCNN(CNN):
-    def __init__(self, max_sent_len, vocb, d1_vocb, d2_vocb, num_classes, emb_dim=100, pos_dim=10, kernel_lst=[3, 4, 5], nb_filters=100,
-                 dropout_rate=0.2, optimizer='adam', lr_rate=0.001, unk_limit=10000, hidden_unit_size=128, use_batch_norm=False, use_l2_reg=False,
-                 reg_coef_conv=0.001, reg_coef_dense=0.001):
-        self.max_sent_len = max_sent_len
+    def __init__(self, cfg, vocb, d1_vocb, d2_vocb):
+        self.cfg = cfg
         self.vocb = vocb
         self.d1_vocb = d1_vocb
         self.d2_vocb = d2_vocb
-        self.num_classes = num_classes
-        self.emb_dim = emb_dim
-        self.pos_dim = pos_dim
-        self.kernel_lst = kernel_lst
-        self.nb_filters = nb_filters
-        self.dropout_rate = dropout_rate
-        self.optimizer = optimizer
-        self.lr_rate = lr_rate
-        self.unk_limit = unk_limit
-        self.hidden_unit_size = hidden_unit_size
-        self.use_batch_norm = use_batch_norm
-        self.use_l2_reg = use_l2_reg
-        self.reg_coef_conv = reg_coef_conv
-        self.reg_coef_dense = reg_coef_dense
+        self.max_sent_len = cfg.max_sent_len
+        self.nb_epoch = cfg.nb_epoch
+        self.batch_size = cfg.batch_size
+        self.num_classes = cfg.num_classes
+        self.emb_dim = cfg.emb_dim
+        self.pos_dim = cfg.pos_dim
+        self.kernel_lst = cfg.kernel_lst
+        self.nb_filters = cfg.nb_filters
+        self.dropout_rate = cfg.dropout_rate
+        self.optimizer = cfg.optimizer
+        self.lr_rate = cfg.lr_rate
+        self.unk_limit = cfg.unk_limit
+        self.hidden_unit_size = cfg.hidden_unit_size
+        self.use_batch_norm = cfg.use_batch_norm
+        self.use_l2_reg = cfg.use_l2_reg
+        self.reg_coef_conv = cfg.reg_coef_conv
+        self.reg_coef_dense = cfg.reg_coef_dense
         self.build_model()
 
     def add_embedding_layer(self):
@@ -403,7 +348,7 @@ class MCCNN(CNN):
         # Dropout
         self.concat_l = Dropout(self.dropout_rate)(self.concat_l)
 
-    def write_hyperparam(self, nb_epoch, batch_size):
+    def write_hyperparam(self):
         # mode: cnn | nb_epoch: 30 | batch: 200 | opt: adam | lr: 0.007 | k_lst: [3, 4, 5] | nb_filters: 100 |
         # emb_dim: 200 | pos_dim: 10 | sent_len: 150 | dropout: 0.8
         # Write k_lst
@@ -413,7 +358,7 @@ class MCCNN(CNN):
         k_lst_str = k_lst_str.rstrip()
         k_lst_str += "]"
         log_str_1 = "mode: {} | nb_epoch: {} | batch: {} | opt: {} | lr: {} | hidden_unit_size: {}".format(type(self).__name__,
-                                                                                                           nb_epoch, batch_size,
+                                                                                                           self.nb_epoch, self.batch_size,
                                                                                                            self.optimizer,
                                                                                                            self.lr_rate,
                                                                                                            self.hidden_unit_size)
@@ -424,23 +369,25 @@ class MCCNN(CNN):
 
 
 class BILSTM(CNN):
-    def __init__(self, max_sent_len, vocb, d1_vocb, d2_vocb, num_classes, emb_dim=100, pos_dim=10, rnn_dim=100, dropout_rate=0.2, optimizer='adam',
-                 lr_rate=0.001, non_static=True, use_pretrained=False, unk_limit=10000, use_self_att=False):
-        self.max_sent_len = max_sent_len
+    def __init__(self, cfg, vocb, d1_vocb, d2_vocb):
+        self.cfg = cfg
         self.vocb = vocb
         self.d1_vocb = d1_vocb
         self.d2_vocb = d2_vocb
-        self.num_classes = num_classes
-        self.emb_dim = emb_dim
-        self.pos_dim = pos_dim
-        self.rnn_dim = rnn_dim
-        self.dropout_rate = dropout_rate
-        self.optimizer = optimizer
-        self.lr_rate = lr_rate
-        self.non_static = non_static
-        self.use_pretrained = use_pretrained
-        self.unk_limit = unk_limit
-        self.use_self_att = use_self_att
+        self.nb_epoch = cfg.nb_epoch
+        self.batch_size = cfg.batch_size
+        self.max_sent_len = cfg.max_sent_len
+        self.num_classes = cfg.num_classes
+        self.emb_dim = cfg.emb_dim
+        self.pos_dim = cfg.pos_dim
+        self.rnn_dim = cfg.rnn_dim
+        self.dropout_rate = cfg.dropout_rate
+        self.optimizer = cfg.optimizer
+        self.lr_rate = cfg.lr_rate
+        self.non_static = cfg.non_static
+        self.use_pretrained = cfg.use_pretrained
+        self.unk_limit = cfg.unk_limit
+        self.use_self_att = cfg.use_self_att
         self.build_model()
 
     def build_model(self):
@@ -453,11 +400,12 @@ class BILSTM(CNN):
             self.add_fc_layer()
         self.compile_model()
 
-    def write_hyperparam(self, nb_epoch, batch_size):
+    def write_hyperparam(self):
         # mode: cnn | nb_epoch: 30 | batch: 200 | opt: adam | lr: 0.007 | pretrain: True | k_lst: [3, 4, 5] | nb_filters: 100 |
         # emb_dim: 200 | pos_dim: 10 | sent_len: 150 | dropout: 0.8
         # Write k_lst
-        log_str_1 = "mode: {} | nb_epoch: {} | batch: {} | opt: {} | lr: {} | pretrain: {}".format(type(self).__name__, nb_epoch, batch_size,
+        log_str_1 = "mode: {} | nb_epoch: {} | batch: {} | opt: {} | lr: {} | pretrain: {}".format(type(self).__name__, self.nb_epoch,
+                                                                                                   self.batch_size,
                                                                                                    self.optimizer, self.lr_rate, self.use_pretrained)
         log_str_2 = "rnn_dim: {} | emb_dim: {} | pos_dim: {} | sent_len: {} | dropout: {}".format(self.rnn_dim, self.emb_dim, self.pos_dim,
                                                                                                   self.max_sent_len, self.dropout_rate)
@@ -485,29 +433,30 @@ class BILSTM(CNN):
 
 
 class PCNN(CNN):
-    def __init__(self, max_sent_len, vocb, d1_vocb, d2_vocb, num_classes, emb_dim=100, pos_dim=10, kernel_lst=[3, 4, 5], nb_filters=100,
-                 dropout_rate=0.2, optimizer='adam', lr_rate=0.001, non_static=True, use_pretrained=False, unk_limit=10000, hidden_unit_size=128,
-                 use_batch_norm=False, use_l2_reg=False, reg_coef_conv=0.001, reg_coef_dense=0.001):
-        self.max_sent_len = max_sent_len
+    def __init__(self, cfg, vocb, d1_vocb, d2_vocb):
+        self.cfg = cfg
         self.vocb = vocb
         self.d1_vocb = d1_vocb
         self.d2_vocb = d2_vocb
-        self.emb_dim = emb_dim
-        self.pos_dim = pos_dim
-        self.kernel_lst = kernel_lst
-        self.nb_filters = nb_filters
-        self.dropout_rate = dropout_rate
-        self.optimizer = optimizer
-        self.lr_rate = lr_rate
-        self.non_static = non_static
-        self.use_pretrained = use_pretrained
-        self.unk_limit = unk_limit
-        self.num_classes = num_classes
-        self.hidden_unit_size = hidden_unit_size
-        self.use_batch_norm = use_batch_norm
-        self.use_l2_reg = use_l2_reg
-        self.reg_coef_conv = reg_coef_conv
-        self.reg_coef_dense = reg_coef_dense
+        self.nb_epoch = cfg.nb_epoch
+        self.batch_size = cfg.batch_size
+        self.max_sent_len = cfg.max_sent_len
+        self.emb_dim = cfg.emb_dim
+        self.pos_dim = cfg.pos_dim
+        self.kernel_lst = cfg.kernel_lst
+        self.nb_filters = cfg.nb_filters
+        self.dropout_rate = cfg.dropout_rate
+        self.optimizer = cfg.optimizer
+        self.lr_rate = cfg.lr_rate
+        self.non_static = cfg.non_static
+        self.use_pretrained = cfg.use_pretrained
+        self.unk_limit = cfg.unk_limit
+        self.num_classes = cfg.num_classes
+        self.hidden_unit_size = cfg.hidden_unit_size
+        self.use_batch_norm = cfg.use_batch_norm
+        self.use_l2_reg = cfg.use_l2_reg
+        self.reg_coef_conv = cfg.reg_coef_conv
+        self.reg_coef_dense = cfg.reg_coef_dense
         self.build_model()
 
     def add_input_layer(self):
@@ -651,7 +600,7 @@ class PCNN(CNN):
                            optimizer=opt,
                            metrics=['accuracy'])
 
-    def train(self, nb_epoch, batch_size, train_data, dev_data):
+    def train(self, train_data, dev_data):
         # Unpack data
         (tr_sent_left, tr_d1_left, tr_d2_left), (tr_sent_mid, tr_d1_mid, tr_d2_mid), (tr_sent_right, tr_d1_right, tr_d2_right), tr_y = train_data
         (de_sent_left, de_d1_left, de_d2_left), (de_sent_mid, de_d1_mid, de_d2_mid), (de_sent_right, de_d1_right, de_d2_right), de_y = dev_data
@@ -665,30 +614,30 @@ class PCNN(CNN):
         logger.info('')
         logger.info("#################################### New Start #####################################")
         # Write log for the hyperparameter
-        log_str_1, log_str_2 = self.write_hyperparam(nb_epoch, batch_size)
+        log_str_1, log_str_2 = self.write_hyperparam()
         logger.info(log_str_1)
         logger.info(log_str_2)
         logger.info('')
 
         # Training
-        train_history = self.model.fit(x=[tr_sent_left, tr_sent_mid, tr_sent_right, tr_d1_left, tr_d1_mid, tr_d1_right,
-                                          tr_d2_left, tr_d2_mid, tr_d2_right], y=tr_y, epochs=nb_epoch, batch_size=batch_size, verbose=1,
-                                       validation_data=[[de_sent_left, de_sent_mid, de_sent_right, de_d1_left, de_d1_mid, de_d1_right,
-                                                         de_d2_left, de_d2_mid, de_d2_right], de_y], callbacks=callback_list)
+        self.model.fit(x=[tr_sent_left, tr_sent_mid, tr_sent_right, tr_d1_left, tr_d1_mid, tr_d1_right,
+                          tr_d2_left, tr_d2_mid, tr_d2_right], y=tr_y, epochs=self.nb_epoch, batch_size=self.batch_size, verbose=1,
+                       validation_data=[[de_sent_left, de_sent_mid, de_sent_right, de_d1_left, de_d1_mid, de_d1_right,
+                                         de_d2_left, de_d2_mid, de_d2_right], de_y], callbacks=self.cfg.callback_list)
 
         # load the best result
         self.model.load_weights(os.path.join(result_dir, 'weights.h5'))
 
         # Metrics for Train data
         pred_tr = self.model.predict(x=[tr_sent_left, tr_sent_mid, tr_sent_right, tr_d1_left, tr_d1_mid, tr_d1_right,
-                                        tr_d2_left, tr_d2_mid, tr_d2_right], batch_size=batch_size, verbose=1)
+                                        tr_d2_left, tr_d2_mid, tr_d2_right], batch_size=self.batch_size, verbose=1)
         train_f1 = f1_score(np.argmax(tr_y, 1), np.argmax(pred_tr, 1), [1, 2, 3, 4], average='micro')
         train_p = precision_score(np.argmax(tr_y, 1), np.argmax(pred_tr, 1), [1, 2, 3, 4], average='micro')
         train_r = recall_score(np.argmax(tr_y, 1), np.argmax(pred_tr, 1), [1, 2, 3, 4], average='micro')
 
         # Metrics for Dev data
         pred_de = self.model.predict(x=[de_sent_left, de_sent_mid, de_sent_right, de_d1_left, de_d1_mid, de_d1_right,
-                                        de_d2_left, de_d2_mid, de_d2_right], batch_size=batch_size, verbose=1)
+                                        de_d2_left, de_d2_mid, de_d2_right], batch_size=self.batch_size, verbose=1)
         val_f1 = f1_score(np.argmax(de_y, 1), np.argmax(pred_de, 1), [1, 2, 3, 4], average='micro')
         val_p = precision_score(np.argmax(de_y, 1), np.argmax(pred_de, 1), [1, 2, 3, 4], average='micro')
         val_r = recall_score(np.argmax(de_y, 1), np.argmax(pred_de, 1), [1, 2, 3, 4], average='micro')
@@ -696,12 +645,12 @@ class PCNN(CNN):
         # Writing the log
         logger.info('##train##, prec: {:.4f}, recall: {:.4f}, F1: {:.4f}'.format(train_p, train_r, train_f1))
         logger.info('##dev##,   prec: {:.4f}, recall: {:.4f}, F1: {:.4f}'.format(val_p, val_r, val_f1))
-    
-    def evaluate(self, test_data, batch_size):
+
+    def evaluate(self, test_data):
         (te_sent_left, te_d1_left, te_d2_left), (te_sent_mid, te_d1_mid, te_d2_mid), (te_sent_right, te_d1_right, te_d2_right), te_y = test_data
         self.model.load_weights(os.path.join(result_dir, 'weights.h5'))
         pred_te = self.model.predict(x=[te_sent_left, te_sent_mid, te_sent_right, te_d1_left, te_d1_mid, te_d1_right,
-                                        te_d2_left, te_d2_mid, te_d2_right], batch_size=batch_size, verbose=1)
+                                        te_d2_left, te_d2_mid, te_d2_right], batch_size=self.batch_size, verbose=1)
         te_f1 = f1_score(np.argmax(te_y, 1), np.argmax(pred_te, 1), [1, 2, 3, 4], average='micro')
         te_p = precision_score(np.argmax(te_y, 1), np.argmax(pred_te, 1), [1, 2, 3, 4], average='micro')
         te_r = recall_score(np.argmax(te_y, 1), np.argmax(pred_te, 1), [1, 2, 3, 4], average='micro')
@@ -711,32 +660,33 @@ class PCNN(CNN):
                                                                                 te_f1))
 
         # Save the best result
-        save_best_result(type(self).__name__, te_f1)
+        save_best_result(type(self).__name__, te_f1, result_dir)
 
 
 class MC_PCNN(PCNN):
-    def __init__(self, max_sent_len, vocb, d1_vocb, d2_vocb, num_classes, emb_dim=100, pos_dim=10, kernel_lst=[3, 4, 5], nb_filters=100,
-                 dropout_rate=0.2, optimizer='adam', lr_rate=0.001, non_static=True, unk_limit=10000, hidden_unit_size=128, use_batch_norm=False,
-                 use_l2_reg=False, reg_coef_conv=0.001, reg_coef_dense=0.001):
-        self.max_sent_len = max_sent_len
+    def __init__(self, cfg, vocb, d1_vocb, d2_vocb):
+        self.cfg = cfg
         self.vocb = vocb
         self.d1_vocb = d1_vocb
         self.d2_vocb = d2_vocb
-        self.emb_dim = emb_dim
-        self.pos_dim = pos_dim
-        self.kernel_lst = kernel_lst
-        self.nb_filters = nb_filters
-        self.dropout_rate = dropout_rate
-        self.optimizer = optimizer
-        self.lr_rate = lr_rate
-        self.non_static = non_static
-        self.unk_limit = unk_limit
-        self.num_classes = num_classes
-        self.hidden_unit_size = hidden_unit_size
-        self.use_batch_norm = use_batch_norm
-        self.use_l2_reg = use_l2_reg
-        self.reg_coef_conv = reg_coef_conv
-        self.reg_coef_dense = reg_coef_dense
+        self.nb_epoch = cfg.nb_epoch
+        self.batch_size = cfg.batch_size
+        self.max_sent_len = cfg.max_sent_len
+        self.emb_dim = cfg.emb_dim
+        self.pos_dim = cfg.pos_dim
+        self.kernel_lst = cfg.kernel_lst
+        self.nb_filters = cfg.nb_filters
+        self.dropout_rate = cfg.dropout_rate
+        self.optimizer = cfg.optimizer
+        self.lr_rate = cfg.lr_rate
+        self.non_static = cfg.non_static
+        self.unk_limit = cfg.unk_limit
+        self.num_classes = cfg.num_classes
+        self.hidden_unit_size = cfg.hidden_unit_size
+        self.use_batch_norm = cfg.use_batch_norm
+        self.use_l2_reg = cfg.use_l2_reg
+        self.reg_coef_conv = cfg.reg_coef_conv
+        self.reg_coef_dense = cfg.reg_coef_dense
         self.build_model()
 
     def add_embedding_layer(self):
@@ -861,7 +811,7 @@ class MC_PCNN(PCNN):
             self.pred_output = Dense(self.num_classes)(self.fc_l)
         self.pred_output = Activation('softmax')(self.pred_output)
 
-    def write_hyperparam(self, nb_epoch, batch_size):
+    def write_hyperparam(self):
         # mode: cnn | nb_epoch: 30 | batch: 200 | opt: adam | lr: 0.007 | pretrain: True | k_lst: [3, 4, 5] | nb_filters: 100 |
         # emb_dim: 200 | pos_dim: 10 | sent_len: 150 | dropout: 0.8
         # Write k_lst
@@ -871,7 +821,7 @@ class MC_PCNN(PCNN):
         k_lst_str = k_lst_str.rstrip()
         k_lst_str += "]"
         log_str_1 = "mode: {} | nb_epoch: {} | batch: {} | opt: {} | lr: {} | hidden_unit_size: {}".format(type(self).__name__,
-                                                                                                           nb_epoch, batch_size,
+                                                                                                           self.nb_epoch, self.batch_size,
                                                                                                            self.optimizer,
                                                                                                            self.lr_rate,
                                                                                                            self.hidden_unit_size)
@@ -930,7 +880,7 @@ class MC_PCNN_ATT(MC_PCNN):
             conv_concat = concatenate([conv_l_left, conv_l_mid, conv_l_right], axis=-2)
 
             # Add dropout until Self-Attention
-            # conv_concat = Dropout(self.dropout_rate)(conv_concat)
+            conv_concat = Dropout(self.dropout_rate)(conv_concat)
 
             # TODO: 각 윈도우별로 self attention을 붙여야 하는지, 모든 window를 concat한 [None, 3, 400]의 상태에서 해야할지
             conv_concat = SeqSelfAttention(units=32, attention_activation='sigmoid')(conv_concat)  # Base self attention
