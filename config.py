@@ -16,9 +16,9 @@ class Config(object):
         self.non_static = True
         self.use_pretrained = True
         self.dev_size = 0.1
-        self.hidden_unit_size = 256
+        self.hidden_unit_size = 128
         self.use_batch_norm = True
-        self.dropout_rate = random.choice([0.3, 0.35, 0.4, 0.45, 0.5])
+        self.dropout_rate = random.choice([0.4, 0.45, 0.5])
 
         # l2 regularizer setting
         self.use_l2_reg = True
@@ -34,7 +34,7 @@ class Config(object):
 
         # 4. Model common settings
         self.emb_dim = 200
-        self.pos_dim = random.choice([10, 20])
+        self.pos_dim = random.choice([5, 10, 20])
         self.max_sent_len = 150
         self.num_classes = 5
         self.unk_limit = 3000

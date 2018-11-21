@@ -317,19 +317,21 @@ class MCCNN(CNN):
         for kernel_size in self.kernel_lst:
             # Sharing the filter weight
             if self.use_l2_reg:
-                conv_layer = Conv2D(self.nb_filters, kernel_size=(kernel_size, self.emb_dim + self.pos_dim * 2), padding='valid',
+                conv_layer = Conv2D(self.nb_filters, kernel_size=(kernel_size, self.emb_dim + self.pos_dim * 2), padding='same',
+                                    strides=(1, self.emb_dim + self.pos_dim * 2),
                                     kernel_regularizer=l2(self.reg_coef_conv))
             else:
-                conv_layer = Conv2D(self.nb_filters, kernel_size=(kernel_size, self.emb_dim + self.pos_dim * 2), padding='valid')
+                conv_layer = Conv2D(self.nb_filters, kernel_size=(kernel_size, self.emb_dim + self.pos_dim * 2), padding='same',
+                                    strides=(1, self.emb_dim + self.pos_dim * 2))
             # zero padding on embedding layer, only on height
-            if kernel_size % 2 == 0:
-                padding_size = int(kernel_size / 2)
-            else:
-                padding_size = int((kernel_size - 1) / 2)
-            padded_emb_concat = ZeroPadding2D((padding_size, 0))(self.emb_concat)
+            # if kernel_size % 2 == 0:
+            #     padding_size = int(kernel_size / 2)
+            # else:
+            #     padding_size = int((kernel_size - 1) / 2)
+            # padded_emb_concat = ZeroPadding2D((padding_size, 0))(self.emb_concat)
 
             # Convolution
-            conv_l = conv_layer(padded_emb_concat)
+            conv_l = conv_layer(self.emb_concat)
             # Batch Normalization
             if self.use_batch_norm:
                 conv_l = BatchNormalization()(conv_l)
@@ -340,6 +342,7 @@ class MCCNN(CNN):
 
             # Append the final result
             layer_lst.append(conv_l)
+            
         if len(layer_lst) != 1:
             self.concat_l = concatenate(layer_lst)
         else:
@@ -749,24 +752,25 @@ class MC_PCNN(PCNN):
         for kernel_size in self.kernel_lst:
             # Sharing the filter weight
             if self.use_l2_reg:
-                conv_layer = Conv2D(self.nb_filters, kernel_size=(kernel_size, self.emb_dim + self.pos_dim * 2), padding='valid',
-                                    kernel_regularizer=l2(self.reg_coef_conv))
+                conv_layer = Conv2D(self.nb_filters, kernel_size=(kernel_size, self.emb_dim + self.pos_dim * 2), padding='same',
+                                    strides=(1, self.emb_dim + self.pos_dim * 2), kernel_regularizer=l2(self.reg_coef_conv))
             else:
-                conv_layer = Conv2D(self.nb_filters, kernel_size=(kernel_size, self.emb_dim + self.pos_dim * 2), padding='valid')
+                conv_layer = Conv2D(self.nb_filters, kernel_size=(kernel_size, self.emb_dim + self.pos_dim * 2), padding='same',
+                                    strides=(1, self.emb_dim + self.pos_dim * 2))
 
             # zero padding on embedding layer, only on height
-            if kernel_size % 2 == 0:
-                padding_size = int(kernel_size / 2)
-            else:
-                padding_size = int((kernel_size - 1) / 2)
-            padded_emb_concat_left = ZeroPadding2D((padding_size, 0))(self.emb_concat_left)
-            padded_emb_concat_mid = ZeroPadding2D((padding_size, 0))(self.emb_concat_mid)
-            padded_emb_concat_right = ZeroPadding2D((padding_size, 0))(self.emb_concat_right)
+            # if kernel_size % 2 == 0:
+            #     padding_size = int(kernel_size / 2)
+            # else:
+            #     padding_size = int((kernel_size - 1) / 2)
+            # padded_emb_concat_left = ZeroPadding2D((padding_size, 0))(self.emb_concat_left)
+            # padded_emb_concat_mid = ZeroPadding2D((padding_size, 0))(self.emb_concat_mid)
+            # padded_emb_concat_right = ZeroPadding2D((padding_size, 0))(self.emb_concat_right)
 
             # left, mid, right convolution
-            conv_l_left = conv_layer(padded_emb_concat_left)
-            conv_l_mid = conv_layer(padded_emb_concat_mid)
-            conv_l_right = conv_layer(padded_emb_concat_right)
+            conv_l_left = conv_layer(self.emb_concat_left)
+            conv_l_mid = conv_layer(self.emb_concat_mid)
+            conv_l_right = conv_layer(self.emb_concat_right)
 
             # Batch normalization
             if self.use_batch_norm:
